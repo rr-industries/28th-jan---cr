@@ -49,6 +49,7 @@ const adminNavGroups = [
     items: [
       { label: "Live Orders", href: "/admin/live-orders", icon: ShoppingBag },
       { label: "KDS", href: "/admin/kds", icon: ChefHat },
+      { label: "All Orders", href: "/admin/all-orders", icon: ListOrdered },
       { label: "Tables", href: "/admin/tables", icon: Grid3X3 },
       { label: "Bookings", href: "/admin/bookings", icon: CalendarCheck },
     ]

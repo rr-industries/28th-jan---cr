@@ -3,41 +3,42 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAdmin } from "@/context/AdminContext";
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Edit2, 
-  Trash2, 
-  Eye, 
-  EyeOff, 
-  Leaf, 
-  Flame, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Edit2,
+  Trash2,
+  Eye,
+  EyeOff,
+  Leaf,
+  Flame,
   Star,
   LoaderCircle,
   Image as ImageIcon,
-  FolderPlus
+  FolderPlus,
+  Package
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogTrigger,
   DialogFooter,
   DialogDescription
 } from "@/components/ui/dialog";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
@@ -59,7 +60,7 @@ type MenuItem = {
 
 const defaultCategories = [
   "APPETIZER",
-  "PASTA", 
+  "PASTA",
   "GRILLED SANDWICH",
   "OPEN SANDWICH",
   "PIZZA",
@@ -108,7 +109,7 @@ export default function MenuManagement() {
   const fetchItems = async () => {
     setLoading(true);
     let query = supabase.from("menu_items").select("*");
-    
+
     if (selectedOutlet) {
       query = query.or(`outlet_id.is.null,outlet_id.eq.${selectedOutlet.id}`);
     } else {
@@ -126,7 +127,7 @@ export default function MenuManagement() {
     const { data } = await supabase
       .from("menu_items")
       .select("category");
-    
+
     if (data) {
       const uniqueCategories = [...new Set(data.map(d => d.category).filter(Boolean))];
       const allCategories = [...new Set([...defaultCategories, ...uniqueCategories])];
@@ -288,8 +289,8 @@ export default function MenuManagement() {
         <div className="flex items-center gap-4">
           <div className="relative flex-1 sm:w-64">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input 
-              placeholder="Search items..." 
+            <Input
+              placeholder="Search items..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 rounded-xl"
@@ -324,28 +325,28 @@ export default function MenuManagement() {
               <form onSubmit={handleSubmit} className="space-y-4 py-4">
                 <div className="space-y-2">
                   <label className="text-sm font-bold">Item Name</label>
-                  <Input 
+                  <Input
                     value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    placeholder="e.g. Mocha Latte" 
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g. Mocha Latte"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-bold">Price (₹)</label>
-                    <Input 
-                      type="number" 
+                    <Input
+                      type="number"
                       step="0.01"
                       value={formData.price}
-                      onChange={(e) => setFormData({...formData, price: e.target.value})}
-                      placeholder="150" 
+                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      placeholder="150"
                     />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-bold">Category</label>
-                    <Select 
-                      value={formData.category} 
-                      onValueChange={(v) => setFormData({...formData, category: v})}
+                    <Select
+                      value={formData.category}
+                      onValueChange={(v) => setFormData({ ...formData, category: v })}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -358,64 +359,64 @@ export default function MenuManagement() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold">Description</label>
-                  <textarea 
+                  <textarea
                     className="w-full rounded-md border p-2 text-sm focus:ring-1 focus:ring-primary"
                     rows={3}
                     value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Tell us about this item..."
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold">Image URL</label>
-                  <Input 
+                  <Input
                     value={formData.image_url}
-                    onChange={(e) => setFormData({...formData, image_url: e.target.value})}
-                    placeholder="https://..." 
+                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                    placeholder="https://..."
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="veg" 
+                    <Checkbox
+                      id="veg"
                       checked={formData.is_vegetarian}
-                      onCheckedChange={(v) => setFormData({...formData, is_vegetarian: !!v})}
+                      onCheckedChange={(v) => setFormData({ ...formData, is_vegetarian: !!v })}
                     />
                     <label htmlFor="veg" className="text-sm font-medium">Vegetarian</label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="spicy" 
+                    <Checkbox
+                      id="spicy"
                       checked={formData.is_spicy}
-                      onCheckedChange={(v) => setFormData({...formData, is_spicy: !!v})}
+                      onCheckedChange={(v) => setFormData({ ...formData, is_spicy: !!v })}
                     />
                     <label htmlFor="spicy" className="text-sm font-medium">Spicy</label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="bestseller" 
+                    <Checkbox
+                      id="bestseller"
                       checked={formData.is_bestseller}
-                      onCheckedChange={(v) => setFormData({...formData, is_bestseller: !!v})}
+                      onCheckedChange={(v) => setFormData({ ...formData, is_bestseller: !!v })}
                     />
                     <label htmlFor="bestseller" className="text-sm font-medium">Bestseller</label>
                   </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="available" 
-                        checked={formData.is_available}
-                        onCheckedChange={(v) => setFormData({...formData, is_available: !!v})}
-                      />
-                      <label htmlFor="available" className="text-sm font-medium">Available</label>
-                    </div>
-                    <div className="flex items-center space-x-2 bg-primary/5 p-2 rounded-lg border border-primary/20">
-                      <Checkbox 
-                        id="global" 
-                        checked={formData.is_global}
-                        onCheckedChange={(v) => setFormData({...formData, is_global: !!v})}
-                      />
-                      <label htmlFor="global" className="text-sm font-bold text-primary">Apply to all outlets</label>
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="available"
+                      checked={formData.is_available}
+                      onCheckedChange={(v) => setFormData({ ...formData, is_available: !!v })}
+                    />
+                    <label htmlFor="available" className="text-sm font-medium">Available</label>
                   </div>
+                  <div className="flex items-center space-x-2 bg-primary/5 p-2 rounded-lg border border-primary/20">
+                    <Checkbox
+                      id="global"
+                      checked={formData.is_global}
+                      onCheckedChange={(v) => setFormData({ ...formData, is_global: !!v })}
+                    />
+                    <label htmlFor="global" className="text-sm font-bold text-primary">Apply to all outlets</label>
+                  </div>
+                </div>
 
                 <DialogFooter className="pt-6">
                   <Button type="submit" className="w-full rounded-xl">
@@ -442,7 +443,7 @@ export default function MenuManagement() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="categoryName">Category Name</Label>
-              <Input 
+              <Input
                 id="categoryName"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
@@ -495,13 +496,13 @@ export default function MenuManagement() {
                 )}>
                   <CardContent className="flex gap-4 p-4">
                     <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-muted">
-                      <img 
-                        src={item.image_url || `https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=200&auto=format&fit=crop`} 
-                        alt={item.name} 
+                      <img
+                        src={item.image_url || `https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=200&auto=format&fit=crop`}
+                        alt={item.name}
                         className="h-full w-full object-cover"
                       />
                     </div>
-                    
+
                     <div className="flex flex-1 flex-col justify-between">
                       <div>
                         <div className="flex items-start justify-between">
@@ -520,38 +521,38 @@ export default function MenuManagement() {
 
                       <div className="mt-4 flex items-center justify-between">
                         <div className="flex items-center gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-9 w-9 rounded-full text-blue-600 hover:bg-blue-50"
-                              onClick={() => handleOpenDialog(item)}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-9 w-9 rounded-full text-orange-600 hover:bg-orange-50"
-                              onClick={() => {
-                                // Logic for ingredients
-                                toast.info("Recipe Management coming soon - use Inventory OS for stock updates");
-                              }}
-                            >
-                              <Package className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-9 w-9 rounded-full text-red-600 hover:bg-red-50"
-                              onClick={() => deleteItem(item.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-full text-blue-600 hover:bg-blue-50"
+                            onClick={() => handleOpenDialog(item)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-full text-orange-600 hover:bg-orange-50"
+                            onClick={() => {
+                              // Logic for ingredients
+                              toast.info("Recipe Management coming soon - use Inventory OS for stock updates");
+                            }}
+                          >
+                            <Package className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-full text-red-600 hover:bg-red-50"
+                            onClick={() => deleteItem(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className={cn(
                             "h-9 rounded-xl border-2 px-4 text-xs font-bold uppercase tracking-widest",
                             item.is_available ? "border-green-100 text-green-600 hover:bg-green-50" : "border-red-100 text-red-600 hover:bg-red-50"
@@ -567,21 +568,21 @@ export default function MenuManagement() {
               </motion.div>
             ))
           )}
-          </AnimatePresence>
-        </div>
-
-        <Dialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-          <DialogContent className="max-w-md rounded-[2.5rem] p-8 border-none shadow-2xl">
-            <DialogHeader className="mb-6">
-              <DialogTitle className="text-2xl font-serif font-bold">Confirm Deletion</DialogTitle>
-              <DialogDescription className="text-lg">Are you sure you want to delete this menu item? This action cannot be undone.</DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="mt-8 gap-3">
-              <Button variant="outline" onClick={() => setDeleteId(null)} className="h-14 rounded-2xl flex-1 font-bold">Cancel</Button>
-              <Button onClick={confirmDelete} className="h-14 rounded-2xl flex-1 font-bold bg-red-600 hover:bg-red-700 text-white shadow-xl shadow-red-600/20">Delete</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        </AnimatePresence>
       </div>
-    );
-  }
+
+      <Dialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <DialogContent className="max-w-md rounded-[2.5rem] p-8 border-none shadow-2xl">
+          <DialogHeader className="mb-6">
+            <DialogTitle className="text-2xl font-serif font-bold">Confirm Deletion</DialogTitle>
+            <DialogDescription className="text-lg">Are you sure you want to delete this menu item? This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-8 gap-3">
+            <Button variant="outline" onClick={() => setDeleteId(null)} className="h-14 rounded-2xl flex-1 font-bold">Cancel</Button>
+            <Button onClick={confirmDelete} className="h-14 rounded-2xl flex-1 font-bold bg-red-600 hover:bg-red-700 text-white shadow-xl shadow-red-600/20">Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

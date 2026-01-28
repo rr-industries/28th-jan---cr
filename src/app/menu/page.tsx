@@ -5,13 +5,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/context/CartContext";
-import { 
-  Plus, 
-  Minus, 
-  ShoppingCart, 
-  Leaf, 
-  Flame, 
-  Star, 
+import {
+  Plus,
+  Minus,
+  ShoppingCart,
+  Leaf,
+  Flame,
+  Star,
   CheckCircle2,
   X,
   AlertTriangle,
@@ -39,7 +39,7 @@ type MenuItem = {
 const categories = [
   "All",
   "Appetizers",
-  "Pasta", 
+  "Pasta",
   "Grilled Sandwich",
   "Open Sandwich",
   "Pizza",
@@ -61,7 +61,12 @@ export default function MenuPage() {
   const [isOrdering, setIsOrdering] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [showCart, setShowCart] = useState(false);
-  const [validTables, setValidTables] = useState<number[]>([]);
+  type Table = {
+    id: number;
+    table_number: string;
+    outlet_id: string;
+  };
+  const [validTables, setValidTables] = useState<Table[]>([]);
   const { cart, addToCart, updateQuantity, removeFromCart, totalPrice, totalItems, clearCart } = useCart();
   const pathname = usePathname();
 
@@ -76,7 +81,7 @@ export default function MenuPage() {
       .select("*")
       .eq("is_available", true)
       .order("name");
-    
+
     if (error) {
       toast.error("Failed to load menu items");
     } else {
@@ -87,15 +92,15 @@ export default function MenuPage() {
   const fetchValidTables = async () => {
     const { data, error } = await supabase
       .from("cafe_tables")
-      .select("id");
-    
+      .select("id, table_number, outlet_id");
+
     if (!error && data) {
-      setValidTables(data.map(t => t.id));
+      setValidTables(data);
     }
   };
 
-  const filteredItems = selectedCategory === "All" 
-    ? items 
+  const filteredItems = selectedCategory === "All"
+    ? items
     : items.filter(item => item.category === selectedCategory);
 
   const handlePlaceOrder = async () => {
@@ -104,10 +109,10 @@ export default function MenuPage() {
       return;
     }
 
-    const tableNum = parseInt(tableNumber);
-    
-    if (!validTables.includes(tableNum)) {
-      toast.error(`Table ${tableNum} is not available in this cafe. Please check your table number.`, {
+    const table = validTables.find(t => t.table_number === tableNumber);
+
+    if (!table) {
+      toast.error(`Table ${tableNumber} is not available in this cafe. Please check your table number.`, {
         icon: <AlertTriangle className="h-5 w-5 text-red-500" />,
         duration: 5000
       });
@@ -116,98 +121,131 @@ export default function MenuPage() {
 
     setIsOrdering(true);
     try {
+      console.log("Placing order for table:", tableNumber, "ID:", table.id);
+
       const { data: tableData, error: tableError } = await supabase
         .from("cafe_tables")
-        .select("*, current_order_id")
-        .eq("id", tableNum)
+        .select(`
+          id,
+          status,
+          table_sessions!table_sessions_table_id_fkey (
+            id,
+            status
+          )
+        `)
+        .eq("id", table.id)
         .single();
-      
-      if (tableError || !tableData) {
-        toast.error(`Table ${tableNum} does not exist. Please enter a valid table number.`);
+
+      if (tableError) {
+        console.error("Table verification error:", tableError);
+        toast.error(`Error verifying table: ${tableError.message}`);
         setIsOrdering(false);
         return;
       }
 
-      if (tableData.current_order_id && tableData.status === 'occupied') {
-        const { data: existingOrder } = await supabase
-          .from("orders")
-          .select("id, total_price, status")
-          .eq("id", tableData.current_order_id)
-          .single();
-        
-        if (existingOrder && existingOrder.status !== 'completed' && existingOrder.status !== 'cancelled') {
-          const orderItems = cart.map(item => ({
-            order_id: existingOrder.id,
-            menu_item_id: item.id,
-            quantity: item.quantity,
-            price_at_order: item.price
-          }));
-
-          const { error: itemsError } = await supabase
-            .from("order_items")
-            .insert(orderItems);
-
-          if (itemsError) throw itemsError;
-
-          const newTotal = Number(existingOrder.total_price) + totalPrice;
-          await supabase
-            .from("orders")
-            .update({ 
-              total_price: newTotal,
-              updated_at: new Date().toISOString()
-            })
-            .eq("id", existingOrder.id);
-
-          setOrderSuccess(true);
-          setShowCart(false);
-          clearCart();
-          toast.success("Items added to your existing order!");
-          return;
-        }
+      if (!tableData) {
+        toast.error(`Error: Table details not found.`);
+        setIsOrdering(false);
+        return;
       }
 
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          table_number: tableNum,
-          total_price: totalPrice,
-          status: 'new',
-          is_paid: false,
-          order_source: 'customer_online'
-        })
-        .select()
-        .single();
+      const sessions = Array.isArray(tableData.table_sessions)
+        ? tableData.table_sessions
+        : (tableData.table_sessions ? [tableData.table_sessions] : []);
 
-      if (orderError) throw orderError;
+      const activeSession = sessions.find((s: any) => s.status === 'active');
+
+      if (!activeSession) {
+        toast.error(`Table ${tableNumber} setup is pending. Please ask staff to activate your table session.`);
+        setIsOrdering(false);
+        return;
+      }
+
+      console.log("Found active session:", activeSession.id);
+
+      // Check for existing uncompleted order to append to
+      const { data: existingOrder, error: existingOrderError } = await supabase
+        .from("orders")
+        .select("id, total_amount, status")
+        .eq("table_id", table.id)
+        .eq("session_id", activeSession.id)
+        .not("status", "in", '("completed","cancelled")')
+        .maybeSingle();
+
+      if (existingOrderError) {
+        console.error("Existing order check error:", existingOrderError);
+      }
+
+      let orderId = existingOrder?.id;
+
+      if (!orderId) {
+        console.log("Creating new order...");
+        const { data: newOrder, error: orderError } = await supabase
+          .from("orders")
+          .insert({
+            table_id: table.id,
+            session_id: activeSession.id,
+            outlet_id: table.outlet_id,
+            total_amount: totalPrice,
+            status: 'new',
+            type: 'dine-in',
+            is_approved: true
+          })
+          .select()
+          .single();
+
+        if (orderError) {
+          console.error("Order creation error:", orderError);
+          throw orderError;
+        }
+        orderId = newOrder.id;
+        console.log("New order created:", orderId);
+      } else {
+        console.log("Appending to existing order:", orderId);
+      }
 
       const orderItems = cart.map(item => ({
-        order_id: order.id,
+        order_id: orderId,
         menu_item_id: item.id,
         quantity: item.quantity,
-        price_at_order: item.price
+        price_at_time: item.price
       }));
 
       const { error: itemsError } = await supabase
         .from("order_items")
         .insert(orderItems);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error("Order items insertion error:", itemsError);
+        throw itemsError;
+      }
 
-      await supabase
-        .from("cafe_tables")
-        .update({ 
-          status: "occupied", 
-          current_order_id: order.id 
-        })
-        .eq("id", tableNum);
+      if (existingOrder) {
+        const newTotal = Number(existingOrder.total_amount) + totalPrice;
+        const { error: updateError } = await supabase
+          .from("orders")
+          .update({
+            total_amount: newTotal,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", orderId);
+
+        if (updateError) console.error("Order total update error:", updateError);
+        toast.success("Items added to your existing order!");
+      } else {
+        await supabase
+          .from("cafe_tables")
+          .update({ status: "occupied" })
+          .eq("id", table.id);
+        toast.success("Order placed successfully!");
+      }
 
       setOrderSuccess(true);
       setShowCart(false);
       clearCart();
-      toast.success("Order placed successfully!");
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to place order. Please try again.");
+    } catch (error: any) {
+      console.error("Detailed Order Placement Error:", error);
+      toast.error(error.message || "Failed to place order. Please try again.");
     } finally {
       setIsOrdering(false);
     }
@@ -239,16 +277,16 @@ export default function MenuPage() {
     );
   }
 
-    return (
-      <div className="flex flex-col min-h-screen bg-background">
-        <header className="sticky top-0 z-50 h-16 flex items-center justify-center bg-white/95 backdrop-blur-md border-b px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
-              <Coffee className="h-5 w-5 text-primary" />
-            </div>
-            <span className="text-lg font-serif font-bold text-primary">CAFE REPUBLIC</span>
-          </Link>
-        </header>
+  return (
+    <div className="flex flex-col min-h-screen bg-background">
+      <header className="sticky top-0 z-50 h-16 flex items-center justify-center bg-white/95 backdrop-blur-md border-b px-4">
+        <Link href="/" className="flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
+            <Coffee className="h-5 w-5 text-primary" />
+          </div>
+          <span className="text-lg font-serif font-bold text-primary">CAFE REPUBLIC</span>
+        </Link>
+      </header>
 
       <div className="sticky top-[64px] z-40 flex gap-2 overflow-x-auto bg-background/95 p-4 backdrop-blur-md hide-scrollbar border-b">
         {categories.map((cat) => (
@@ -257,8 +295,8 @@ export default function MenuPage() {
             onClick={() => setSelectedCategory(cat)}
             className={cn(
               "whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium transition-colors",
-              selectedCategory === cat 
-                ? "bg-primary text-white" 
+              selectedCategory === cat
+                ? "bg-primary text-white"
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
             )}
           >
@@ -281,9 +319,9 @@ export default function MenuPage() {
                 className="flex gap-4 rounded-2xl bg-white p-3 shadow-sm border"
               >
                 <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-muted">
-                  <img 
-                    src={item.image_url || `https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=200&auto=format&fit=crop`} 
-                    alt={item.name} 
+                  <img
+                    src={item.image_url || `https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=200&auto=format&fit=crop`}
+                    alt={item.name}
                     className="h-full w-full object-cover"
                   />
                   {item.is_bestseller && (
@@ -292,7 +330,7 @@ export default function MenuPage() {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="flex flex-1 flex-col justify-between py-0.5">
                   <div>
                     <div className="flex items-start justify-between">
@@ -303,22 +341,22 @@ export default function MenuPage() {
                       {item.description}
                     </p>
                     <div className="mt-2 flex gap-2">
-                      {item.is_vegetarian && <Leaf className="h-3 w-3 text-green-500" title="Vegetarian" />}
-                      {item.is_spicy && <Flame className="h-3 w-3 text-red-500" title="Spicy" />}
+                      {item.is_vegetarian && <Leaf className="h-3 w-3 text-green-500" />}
+                      {item.is_spicy && <Flame className="h-3 w-3 text-red-500" />}
                     </div>
                   </div>
 
                   <div className="mt-2 flex items-center justify-end">
                     {cartItem ? (
                       <div className="flex items-center gap-3 rounded-full bg-muted px-2 py-1">
-                        <button 
+                        <button
                           onClick={() => updateQuantity(item.id, -1)}
                           className="rounded-full bg-white p-1 shadow-sm hover:bg-primary hover:text-white"
                         >
                           <Minus className="h-3 w-3" />
                         </button>
                         <span className="text-sm font-bold w-4 text-center">{cartItem.quantity}</span>
-                        <button 
+                        <button
                           onClick={() => updateQuantity(item.id, 1)}
                           className="rounded-full bg-white p-1 shadow-sm hover:bg-primary hover:text-white"
                         >
@@ -326,8 +364,8 @@ export default function MenuPage() {
                         </button>
                       </div>
                     ) : (
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         variant="secondary"
                         onClick={() => addToCart({
                           id: item.id,
@@ -351,7 +389,7 @@ export default function MenuPage() {
 
       {totalItems > 0 && !showCart && (
         <div className="fixed bottom-24 left-4 right-4 z-40 md:bottom-8 md:left-auto md:right-8 md:w-80">
-          <Button 
+          <Button
             onClick={() => setShowCart(true)}
             className="h-14 w-full justify-between rounded-full bg-primary px-6 shadow-2xl"
           >
@@ -388,7 +426,7 @@ export default function MenuPage() {
             >
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-serif font-bold">Your Order</h2>
-                <button 
+                <button
                   onClick={() => setShowCart(false)}
                   className="rounded-full p-2 hover:bg-muted"
                 >
@@ -400,10 +438,10 @@ export default function MenuPage() {
                 {cart.map((item) => (
                   <div key={item.id} className="flex items-center gap-4 rounded-xl bg-muted/30 p-3">
                     <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted">
-                      <img 
-                        src={item.image_url || `https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=200&auto=format&fit=crop`} 
-                        alt={item.name} 
-                        className="h-full w-full object-cover" 
+                      <img
+                        src={item.image_url || `https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=200&auto=format&fit=crop`}
+                        alt={item.name}
+                        className="h-full w-full object-cover"
                       />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -411,14 +449,14 @@ export default function MenuPage() {
                       <p className="text-xs text-muted-foreground">₹{item.price} × {item.quantity}</p>
                     </div>
                     <div className="flex items-center gap-2 rounded-full bg-white px-2 py-1 shadow-sm">
-                      <button 
+                      <button
                         onClick={() => updateQuantity(item.id, -1)}
                         className="rounded-full p-1 hover:bg-muted"
                       >
                         <Minus className="h-3 w-3" />
                       </button>
                       <span className="w-5 text-center font-bold text-sm">{item.quantity}</span>
-                      <button 
+                      <button
                         onClick={() => updateQuantity(item.id, 1)}
                         className="rounded-full p-1 hover:bg-muted"
                       >
@@ -432,17 +470,17 @@ export default function MenuPage() {
               <div className="space-y-4">
                 <div>
                   <label className="mb-2 block text-sm font-bold">Table Number</label>
-                  <Input 
-                    type="number" 
-                    placeholder="Enter your table number" 
+                  <Input
+                    type="number"
+                    placeholder="Enter your table number"
                     value={tableNumber}
                     onChange={(e) => setTableNumber(e.target.value)}
                     className="h-12 rounded-xl text-center text-lg font-bold"
                   />
-                  {tableNumber && !validTables.includes(parseInt(tableNumber)) && (
+                  {tableNumber && !validTables.find(t => t.table_number === tableNumber) && (
                     <p className="mt-2 text-xs text-red-500 flex items-center gap-1">
                       <AlertTriangle className="h-3 w-3" />
-                      This table number is not available. Valid tables: {validTables.slice(0, 10).join(', ')}{validTables.length > 10 ? '...' : ''}
+                      This table number is not available. Valid tables: {validTables.slice(0, 10).map(t => t.table_number).join(', ')}{validTables.length > 10 ? '...' : ''}
                     </p>
                   )}
                 </div>
@@ -462,9 +500,9 @@ export default function MenuPage() {
                   </div>
                 </div>
 
-                <Button 
-                  onClick={handlePlaceOrder} 
-                  disabled={isOrdering || !tableNumber || !validTables.includes(parseInt(tableNumber))}
+                <Button
+                  onClick={handlePlaceOrder}
+                  disabled={isOrdering || !tableNumber || !validTables.find(t => t.table_number === tableNumber)}
                   className="h-14 w-full rounded-full text-lg font-bold mb-4"
                 >
                   {isOrdering ? "Placing Order..." : "Confirm Order"}
@@ -473,7 +511,7 @@ export default function MenuPage() {
             </motion.div>
           </>
         )}
-        </AnimatePresence>
+      </AnimatePresence>
     </div>
   );
 }
