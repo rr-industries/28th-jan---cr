@@ -26,10 +26,6 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "origin-when-cross-origin" },
-          {
-            key: "Content-Security-Policy",
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://slelguoygbfzlpylpxfs.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' blob: data: https://images.unsplash.com https://slelguoygbfzlpylpxfs.supabase.co; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://slelguoygbfzlpylpxfs.supabase.co wss://slelguoygbfzlpylpxfs.supabase.co; frame-ancestors 'none';",
-          },
         ],
       },
     ];

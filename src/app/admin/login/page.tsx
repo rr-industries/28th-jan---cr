@@ -6,7 +6,10 @@ import { supabase } from "@/lib/supabase";
 import { Coffee, Eye, EyeOff, LoaderCircle, User, Lock, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 
+import { useAdmin } from "@/context/AdminContext";
+
 export default function AdminLoginPage() {
+  const { refreshPermissions } = useAdmin();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -25,7 +28,14 @@ export default function AdminLoginPage() {
         p_password: password.trim()
       });
 
-      if (rpcError || !employeeData || employeeData.length === 0) {
+      if (rpcError) {
+        console.error("RPC Error:", rpcError);
+        setError(`Login verification failed: ${rpcError.message}`);
+        setLoading(false);
+        return;
+      }
+
+      if (!employeeData || employeeData.length === 0) {
         setError("Invalid identifier or security key.");
         setLoading(false);
         return;
@@ -39,7 +49,7 @@ export default function AdminLoginPage() {
       }
 
       const { data: outlets } = await supabase.from('outlets').select('id, name').limit(1);
-      
+
       localStorage.setItem('employee_session', JSON.stringify({
         id: employee.id,
         employee_id: employee.employee_id,
@@ -49,6 +59,7 @@ export default function AdminLoginPage() {
         logged_in_at: new Date().toISOString()
       }));
 
+      await refreshPermissions();
       router.push("/admin/dashboard");
     } catch (err) {
       setError("Login failed.");
@@ -58,7 +69,7 @@ export default function AdminLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#fafaf9] p-6">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-[320px] space-y-8"
