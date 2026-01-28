@@ -2,21 +2,21 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { 
-  Coffee, 
-  Search, 
-  Plus, 
-  ChevronRight, 
-  ShoppingCart, 
-  Clock, 
-  LayoutGrid, 
+import {
+  Coffee,
+  Search,
+  Plus,
+  ChevronRight,
+  ShoppingCart,
+  Clock,
+  LayoutGrid,
   CheckCircle2,
   AlertTriangle,
   QrCode,
@@ -86,9 +86,9 @@ function AdminTablesPage() {
 
     const tablesChannel = supabase
       .channel(`tables-changes-${selectedOutlet.id}`)
-      .on("postgres_changes", { 
-        event: "*", 
-        schema: "public", 
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
         table: "cafe_tables",
         filter: `outlet_id=eq.${selectedOutlet.id}`
       }, fetchTables)
@@ -105,7 +105,7 @@ function AdminTablesPage() {
       .from("cafe_tables")
       .select("*")
       .eq("outlet_id", selectedOutlet.id);
-    
+
     if (data) {
       const sorted = [...data].sort((a, b) => {
         const numA = parseInt(a.table_number) || 0;
@@ -134,14 +134,14 @@ function AdminTablesPage() {
     const newTables = [];
     for (let i = 1; i <= count; i++) {
       const num = currentMax + i;
-      newTables.push({ 
+      newTables.push({
         outlet_id: selectedOutlet.id,
-        table_number: num.toString(), 
-        status: "available", 
-        current_order_id: null 
+        table_number: num.toString(),
+        status: "available",
+        current_order_id: null
       });
     }
-    
+
     const { error } = await supabase.from("cafe_tables").insert(newTables);
     if (error) toast.error("Failed to add tables");
     else { toast.success(`Added ${count} tables`); fetchTables(); }
@@ -156,7 +156,7 @@ function AdminTablesPage() {
       toast.error(`Can only remove ${availableTables.length} free, non-merged tables`);
       return;
     }
-    
+
     const tablesToRemove = availableTables.slice(0, count).map(t => t.id);
     const { error } = await supabase.from("cafe_tables").delete().in("id", tablesToRemove);
     if (error) toast.error("Failed to remove tables");
@@ -166,7 +166,7 @@ function AdminTablesPage() {
   const handleMerge = async () => {
     if (!hasPermission("tables.merge")) return toast.error("Permission denied");
     if (selectedForMerge.length < 2) return toast.error("Select at least 2 tables to merge");
-    
+
     // Check if any selected table is already merged or busy
     const busyTables = tables.filter(t => selectedForMerge.includes(t.id) && (t.status !== "available" || t.group_id));
     if (busyTables.length > 0) {
@@ -190,7 +190,7 @@ function AdminTablesPage() {
 
   const handleUnmerge = async (groupId: string) => {
     if (!hasPermission("tables.unmerge")) return toast.error("Permission denied");
-    
+
     // Check if any table in group is occupied
     const groupTables = tables.filter(t => t.group_id === groupId);
     if (groupTables.some(t => t.status !== "available")) {
@@ -211,11 +211,11 @@ function AdminTablesPage() {
 
   const toggleTableStatus = async (table: Table) => {
     if (!hasPermission("tables.edit")) return;
-    
+
     const newStatus = table.status === "available" ? "occupied" : "available";
     const { error } = await supabase
       .from("cafe_tables")
-      .update({ 
+      .update({
         status: newStatus,
         current_order_id: newStatus === "available" ? null : table.current_order_id
       })
@@ -249,8 +249,8 @@ function AdminTablesPage() {
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
           {hasPermission("tables.merge") && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowMergeModal(true)}
               className="rounded-2xl border-2 flex-1 md:flex-none"
             >
@@ -259,8 +259,8 @@ function AdminTablesPage() {
             </Button>
           )}
           {hasPermission("settings.edit") && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowTableSettings(true)}
               className="rounded-2xl border-2 flex-1 md:flex-none"
             >
@@ -280,10 +280,10 @@ function AdminTablesPage() {
       {Object.keys(groupedTables).length > 0 && (
         <div className="space-y-4">
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Merged Table Groups</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(groupedTables).map(([groupId, groupTables]) => (
-                <Card key={groupId} className="bg-primary/5 border-2 border-primary/10 rounded-[2.5rem] p-4 shadow-sm relative overflow-hidden">
-                  <div className="flex items-center justify-between mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(groupedTables).map(([groupId, groupTables]) => (
+              <Card key={groupId} className="bg-primary/5 border-2 border-primary/10 rounded-[2.5rem] p-4 shadow-sm relative overflow-hidden">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Combine className="h-4 w-4 text-primary" />
                     <span className="font-bold">Group {groupTables.map(t => t.table_number).join("-")}</span>
@@ -358,29 +358,29 @@ function AdminTablesPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowTableSettings(false)}>
             <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} className="relative w-full max-w-md rounded-[2.5rem] bg-white p-10 shadow-2xl" onClick={e => e.stopPropagation()}>
               <h2 className="text-2xl font-serif font-bold text-center mb-8">Configure Tables</h2>
-                <div className="space-y-6">
-                  <div>
-                    <p className="text-xs font-bold uppercase text-muted-foreground mb-3">Add New</p>
-                    <div className="grid grid-cols-4 gap-3">
-                      {[1, 5, 10, 20].map(num => <Button key={num} variant="outline" onClick={() => addTables(num)} className="rounded-2xl h-12 font-bold hover:bg-primary hover:text-white">+{num}</Button>)}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase text-red-500 mb-3">Remove Tables</p>
-                    <div className="grid grid-cols-4 gap-3">
-                      {[1, 5, 10, 20].map(num => (
-                        <Button 
-                          key={num} 
-                          variant="outline" 
-                          onClick={() => removeTables(num)} 
-                          className="rounded-2xl h-12 font-bold border-red-100 text-red-500 hover:bg-red-50"
-                        >
-                          -{num}
-                        </Button>
-                      ))}
-                    </div>
+              <div className="space-y-6">
+                <div>
+                  <p className="text-xs font-bold uppercase text-muted-foreground mb-3">Add New</p>
+                  <div className="grid grid-cols-4 gap-3">
+                    {[1, 5, 10, 20].map(num => <Button key={num} variant="outline" onClick={() => addTables(num)} className="rounded-2xl h-12 font-bold hover:bg-primary hover:text-white">+{num}</Button>)}
                   </div>
                 </div>
+                <div>
+                  <p className="text-xs font-bold uppercase text-red-500 mb-3">Remove Tables</p>
+                  <div className="grid grid-cols-4 gap-3">
+                    {[1, 5, 10, 20].map(num => (
+                      <Button
+                        key={num}
+                        variant="outline"
+                        onClick={() => removeTables(num)}
+                        className="rounded-2xl h-12 font-bold border-red-100 text-red-500 hover:bg-red-50"
+                      >
+                        -{num}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
               <Button onClick={() => setShowTableSettings(false)} className="w-full mt-10 h-14 rounded-2xl text-lg font-bold">Done</Button>
             </motion.div>
           </motion.div>
@@ -392,35 +392,35 @@ function AdminTablesPage() {
 
 // --- MAIN COMPONENT: ORDERING CONSOLE (SHARED) ---
 function SharedOrderingPage() {
-    const { selectedOutlet, hasPermission, user } = useAdmin();
-    const [tables, setTables] = useState<Table[]>([]);
-    const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [selectedTable, setSelectedTable] = useState<Table | null>(null);
-    const [cart, setCart] = useState<CartItem[]>([]);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [activeCategory, setActiveCategory] = useState("All");
+  const { selectedOutlet, hasPermission, user } = useAdmin();
+  const [tables, setTables] = useState<Table[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState("All");
 
-    useEffect(() => {
-      if (!selectedOutlet) return;
-      fetchData();
+  useEffect(() => {
+    if (!selectedOutlet) return;
+    fetchData();
 
-      const tablesSubscription = supabase
-        .channel('table-updates')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'cafe_tables', filter: `outlet_id=eq.${selectedOutlet.id}` }, fetchData)
-        .subscribe();
+    const tablesSubscription = supabase
+      .channel('table-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cafe_tables', filter: `outlet_id=eq.${selectedOutlet.id}` }, fetchData)
+      .subscribe();
 
-      return () => {
-        supabase.removeChannel(tablesSubscription);
-      };
-    }, [selectedOutlet]);
+    return () => {
+      supabase.removeChannel(tablesSubscription);
+    };
+  }, [selectedOutlet]);
 
-    const fetchData = async () => {
-      if (!selectedOutlet) return;
-      
-      const { data: tablesData } = await supabase
-        .from("cafe_tables")
-        .select(`
+  const fetchData = async () => {
+    if (!selectedOutlet) return;
+
+    const { data: tablesData } = await supabase
+      .from("cafe_tables")
+      .select(`
           *,
           table_sessions!table_sessions_table_id_fkey (
             id,
@@ -429,67 +429,67 @@ function SharedOrderingPage() {
             created_at
           )
         `)
-        .eq("outlet_id", selectedOutlet.id)
-        .order("id");
+      .eq("outlet_id", selectedOutlet.id)
+      .order("id");
 
-      if (tablesData) {
-        const processedTables = tablesData.map((t: any) => ({
-          ...t,
-          current_session: t.table_sessions?.find((s: any) => s.status === 'active')
-        }));
-        setTables(processedTables);
-      }
+    if (tablesData) {
+      const processedTables = tablesData.map((t: any) => ({
+        ...t,
+        current_session: t.table_sessions?.find((s: any) => s.status === 'active')
+      }));
+      setTables(processedTables);
+    }
 
-      const { data: menuData } = await supabase
-        .from("menu_items")
-        .select("*")
-        .eq("outlet_id", selectedOutlet.id)
-        .eq("is_available", true);
-      
-      if (menuData) setMenuItems(menuData);
-      setLoading(false);
-    };
+    const { data: menuData } = await supabase
+      .from("menu_items")
+      .select("*")
+      .eq("outlet_id", selectedOutlet.id)
+      .eq("is_available", true);
 
-    const [showOpenSessionModal, setShowOpenSessionModal] = useState(false);
-    const [openingTableId, setOpeningTableId] = useState<number | null>(null);
-    const [guestCount, setGuestCount] = useState("1");
-    const [verifiedPhone, setVerifiedPhone] = useState("");
+    if (menuData) setMenuItems(menuData);
+    setLoading(false);
+  };
 
-    const openSession = async () => {
-      if (!openingTableId) return;
-      if (!hasPermission("orders.create")) return toast.error("Permission denied");
-      if (!selectedOutlet) return;
-      
-      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      
-      const { data: session, error } = await supabase
-        .from("table_sessions")
-        .insert({
-          table_id: openingTableId,
-          session_token: token,
-          status: 'active',
-          outlet_id: selectedOutlet.id,
-          opened_by: user?.id || 'SYSTEM',
-          guest_count: parseInt(guestCount) || 1,
-          verified_phone: verifiedPhone || null,
-          expires_at: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()
-        })
-        .select()
-        .single();
+  const [showOpenSessionModal, setShowOpenSessionModal] = useState(false);
+  const [openingTableId, setOpeningTableId] = useState<number | null>(null);
+  const [guestCount, setGuestCount] = useState("1");
+  const [verifiedPhone, setVerifiedPhone] = useState("");
 
-      if (error) {
-        toast.error("Failed to open table session");
-        console.error("Session open error:", error);
-      } else {
-        toast.success("Table session opened");
-        await supabase.from("cafe_tables").update({ status: 'occupied' }).eq("id", openingTableId);
-        setShowOpenSessionModal(false);
-        setOpeningTableId(null);
-        setGuestCount("1");
-        setVerifiedPhone("");
-        fetchData();
-      }
-    };
+  const openSession = async () => {
+    if (!openingTableId) return;
+    if (!hasPermission("orders.create")) return toast.error("Permission denied");
+    if (!selectedOutlet) return;
+
+    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
+    const { data: session, error } = await supabase
+      .from("table_sessions")
+      .insert({
+        table_id: openingTableId,
+        session_token: token,
+        status: 'active',
+        outlet_id: selectedOutlet.id,
+        opened_by: user?.id || 'SYSTEM',
+        guest_count: parseInt(guestCount) || 1,
+        verified_phone: verifiedPhone || null,
+        expires_at: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast.error("Failed to open table session");
+      console.error("Session open error:", error);
+    } else {
+      toast.success("Table session opened");
+      await supabase.from("cafe_tables").update({ status: 'occupied' }).eq("id", openingTableId);
+      setShowOpenSessionModal(false);
+      setOpeningTableId(null);
+      setGuestCount("1");
+      setVerifiedPhone("");
+      fetchData();
+    }
+  };
 
 
 
@@ -558,266 +558,269 @@ function SharedOrderingPage() {
           </div>
         </div>
 
-          <div className="flex-1 flex flex-col bg-muted/20">
-            {!selectedTable ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-12 opacity-40">
-                <Coffee className="w-20 h-20 mb-4" />
-                <h3 className="text-2xl font-serif font-bold italic">Select a table to begin</h3>
-              </div>
-            ) : (
-              <div className="flex flex-1 flex-col overflow-hidden">
-                {/* Session Header / Start Session Control */}
-                <div className="bg-white px-8 py-6 border-b flex justify-between items-center shrink-0">
-                  <div className="flex items-center gap-6">
-                    <div className={cn(
-                      "h-16 w-16 rounded-[1.5rem] flex items-center justify-center text-2xl font-serif font-bold transition-colors",
-                      selectedTable.current_session ? "bg-primary text-white" : "bg-muted text-muted-foreground"
-                    )}>
-                      {selectedTable.table_number}
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-serif font-bold">Table {selectedTable.table_number}</h2>
-                      <div className="flex items-center gap-2 mt-1">
-                        {selectedTable.current_session ? (
-                          <>
-                            <Badge className="bg-green-500 rounded-full px-3 py-1">SESSION ACTIVE</Badge>
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              Started {new Date(selectedTable.current_session.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </>
-                        ) : (
-                          <Badge variant="secondary" className="rounded-full px-3 py-1">SESSION INACTIVE</Badge>
-                        )}
-                      </div>
-                    </div>
+        <div className="flex-1 flex flex-col bg-muted/20">
+          {!selectedTable ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-12 opacity-40">
+              <Coffee className="w-20 h-20 mb-4" />
+              <h3 className="text-2xl font-serif font-bold italic">Select a table to begin</h3>
+            </div>
+          ) : (
+            <div className="flex flex-1 flex-col overflow-hidden">
+              {/* Session Header / Start Session Control */}
+              <div className="bg-white px-8 py-6 border-b flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-6">
+                  <div className={cn(
+                    "h-16 w-16 rounded-[1.5rem] flex items-center justify-center text-2xl font-serif font-bold transition-colors",
+                    selectedTable.current_session ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+                  )}>
+                    {selectedTable.table_number}
                   </div>
-                  <div className="flex gap-3">
+                  <div>
+                    <h2 className="text-2xl font-serif font-bold">Table {selectedTable.table_number}</h2>
+                    <div className="flex items-center gap-2 mt-1">
                       {selectedTable.current_session ? (
-                        <Button 
-                          variant="destructive" 
-                          className="rounded-2xl h-14 px-8 font-bold text-lg shadow-lg shadow-red-200" 
-                          onClick={() => closeSession(selectedTable.id, selectedTable.current_session!.id)}
-                        >
-                          <LogOut className="mr-2 h-5 w-5" />
-                          End Session
-                        </Button>
+                        <>
+                          <Badge className="bg-green-500 rounded-full px-3 py-1">SESSION ACTIVE</Badge>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Started {new Date(selectedTable.current_session.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </>
                       ) : (
-                        <Button 
-                          className="rounded-2xl h-14 px-10 font-bold text-xl shadow-xl shadow-primary/20 animate-pulse hover:animate-none" 
-                          onClick={() => {
-                            setOpeningTableId(selectedTable.id);
-                            setShowOpenSessionModal(true);
-                          }}
-                        >
-                          <Play className="mr-2 h-6 w-6 fill-current" />
-                          START SESSION
-                        </Button>
+                        <Badge variant="secondary" className="rounded-full px-3 py-1">SESSION INACTIVE</Badge>
                       )}
                     </div>
                   </div>
+                </div>
+                <div className="flex gap-3">
+                  {selectedTable.current_session ? (
+                    <Button
+                      variant="destructive"
+                      className="rounded-2xl h-14 px-8 font-bold text-lg shadow-lg shadow-red-200"
+                      onClick={() => closeSession(selectedTable.id, selectedTable.current_session!.id)}
+                    >
+                      <LogOut className="mr-2 h-5 w-5" />
+                      End Session
+                    </Button>
+                  ) : (
+                    <Button
+                      className="rounded-2xl h-14 px-10 font-bold text-xl shadow-xl shadow-primary/20 animate-pulse hover:animate-none"
+                      onClick={() => {
+                        setOpeningTableId(selectedTable.id);
+                        setShowOpenSessionModal(true);
+                      }}
+                    >
+                      <Play className="mr-2 h-6 w-6 fill-current" />
+                      START SESSION
+                    </Button>
+                  )}
+                </div>
+              </div>
 
-                  <Dialog open={showOpenSessionModal} onOpenChange={setShowOpenSessionModal}>
-                    <DialogContent className="max-w-md rounded-[2.5rem] p-10 border-none shadow-2xl">
-                      <DialogHeader className="mb-8 text-center">
-                        <DialogTitle className="text-3xl font-serif font-bold">Open Table {selectedTable.table_number}</DialogTitle>
-                        <DialogDescription className="text-lg">Set up a new dining session for this table</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-6">
-                        <div className="space-y-2">
-                          <label className="text-xs font-black uppercase tracking-widest text-primary">Guest Count</label>
-                          <Input 
-                            type="number" 
-                            min="1" 
-                            max="20"
-                            value={guestCount}
-                            onChange={(e) => setGuestCount(e.target.value)}
-                            className="h-14 rounded-2xl text-xl font-bold border-2 focus:border-primary shadow-sm"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-black uppercase tracking-widest text-primary">Customer Phone (Optional)</label>
-                          <Input 
-                            type="tel" 
-                            placeholder="+91"
-                            value={verifiedPhone}
-                            onChange={(e) => setVerifiedPhone(e.target.value)}
-                            className="h-14 rounded-2xl text-xl font-bold border-2 focus:border-primary shadow-sm"
-                          />
-                        </div>
-                        <Button 
-                          onClick={openSession}
-                          className="w-full h-16 rounded-2xl text-xl font-black uppercase tracking-widest shadow-xl shadow-primary/20 mt-4"
-                        >
-                          ACTIVATE TABLE
-                        </Button>
+              <Dialog open={showOpenSessionModal} onOpenChange={setShowOpenSessionModal}>
+                <DialogContent className="max-w-md rounded-[2.5rem] p-10 border-none shadow-2xl">
+                  <DialogHeader className="mb-8 text-center">
+                    <DialogTitle className="text-3xl font-serif font-bold">Open Table {selectedTable.table_number}</DialogTitle>
+                    <DialogDescription className="text-lg">Set up a new dining session for this table</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-black uppercase tracking-widest text-primary">Guest Count</label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={guestCount}
+                        onChange={(e) => setGuestCount(e.target.value)}
+                        className="h-14 rounded-2xl text-xl font-bold border-2 focus:border-primary shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-black uppercase tracking-widest text-primary">Customer Phone (Optional)</label>
+                      <Input
+                        type="tel"
+                        placeholder="+91"
+                        value={verifiedPhone}
+                        onChange={(e) => setVerifiedPhone(e.target.value)}
+                        className="h-14 rounded-2xl text-xl font-bold border-2 focus:border-primary shadow-sm"
+                      />
+                    </div>
+                    <Button
+                      onClick={openSession}
+                      className="w-full h-16 rounded-2xl text-xl font-black uppercase tracking-widest shadow-xl shadow-primary/20 mt-4"
+                    >
+                      ACTIVATE TABLE
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+
+              {selectedTable.current_session ? (
+                <div className="flex-1 flex overflow-hidden">
+                  {/* Menu Selection Section */}
+                  <div className="flex-1 flex flex-col overflow-hidden p-8 gap-8">
+                    <div className="flex flex-col md:flex-row gap-4 shrink-0">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                        <Input
+                          placeholder="Search menu items..."
+                          className="pl-12 h-14 rounded-2xl bg-white border-2 text-lg shadow-sm focus:border-primary"
+                          value={searchQuery}
+                          onChange={e => setSearchQuery(e.target.value)}
+                        />
                       </div>
-                    </DialogContent>
-                  </Dialog>
-
-
-                {selectedTable.current_session ? (
-                  <div className="flex-1 flex overflow-hidden">
-                    {/* Menu Selection Section */}
-                    <div className="flex-1 flex flex-col overflow-hidden p-8 gap-8">
-                      <div className="flex flex-col md:flex-row gap-4 shrink-0">
-                        <div className="relative flex-1">
-                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                          <Input 
-                            placeholder="Search menu items..." 
-                            className="pl-12 h-14 rounded-2xl bg-white border-2 text-lg shadow-sm focus:border-primary" 
-                            value={searchQuery} 
-                            onChange={e => setSearchQuery(e.target.value)} 
-                          />
-                        </div>
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                          {categories.map(cat => (
-                            <Button
-                              key={cat}
-                              variant={activeCategory === cat ? "default" : "outline"}
-                              onClick={() => setActiveCategory(cat)}
-                              className="rounded-xl h-14 px-6 font-bold whitespace-nowrap border-2"
-                            >
-                              {cat}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex-1 overflow-y-auto grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
-                        {filteredMenu.map(item => (
-                          <motion.div
-                            key={item.id}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                        {categories.map(cat => (
+                          <Button
+                            key={cat}
+                            variant={activeCategory === cat ? "default" : "outline"}
+                            onClick={() => setActiveCategory(cat)}
+                            className="rounded-xl h-14 px-6 font-bold whitespace-nowrap border-2"
                           >
-                            <Card 
-                              className="rounded-[2rem] border-2 hover:border-primary transition-all p-5 flex flex-col gap-4 cursor-pointer h-full group bg-white shadow-sm hover:shadow-xl" 
-                              onClick={() => addToCart(item)}
-                            >
-                              <div className="aspect-square w-full rounded-2xl bg-muted overflow-hidden relative">
-                                <img src={item.image_url || "/placeholder-food.jpg"} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                                <div className="absolute top-3 right-3 h-10 w-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                                  <Plus className="h-6 w-6 text-primary" />
-                                </div>
-                              </div>
-                              <div className="space-y-1">
-                                <h4 className="font-bold text-lg leading-tight">{item.name}</h4>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{item.category}</span>
-                                  <span className="text-xl font-serif font-bold text-primary">₹{item.price}</span>
-                                </div>
-                              </div>
-                            </Card>
-                          </motion.div>
+                            {cat}
+                          </Button>
                         ))}
                       </div>
                     </div>
 
-                    {/* Cart Section */}
-                    <div className="w-[400px] bg-white border-l flex flex-col shadow-2xl z-10">
-                      <div className="p-8 border-b bg-muted/5 flex items-center justify-between">
-                        <h3 className="text-2xl font-serif font-bold flex items-center gap-3">
-                          <ShoppingCart className="h-6 w-6 text-primary" />
-                          Live Cart
-                        </h3>
-                        <Badge className="bg-primary/10 text-primary h-8 px-4 rounded-full font-bold">{cart.reduce((acc, i) => acc + i.quantity, 0)} Items</Badge>
-                      </div>
-
-                      <div className="flex-1 overflow-y-auto p-8 space-y-6">
-                        {cart.length === 0 ? (
-                          <div className="h-full flex flex-col items-center justify-center text-center opacity-30">
-                            <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-4">
-                              <Plus className="h-10 w-10" />
-                            </div>
-                            <p className="font-serif italic text-lg">Your cart is empty</p>
-                          </div>
-                        ) : (
-                          cart.map(item => (
-                            <div key={item.id} className="flex gap-4 items-center bg-muted/20 p-5 rounded-[1.5rem] group relative">
-                              <div className="h-14 w-14 rounded-xl bg-muted overflow-hidden shrink-0">
-                                <img src={item.image_url || "/placeholder-food.jpg"} className="w-full h-full object-cover" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-bold text-sm truncate">{item.name}</h4>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-6 w-6 rounded-lg bg-white shadow-sm"
-                                    onClick={(e) => { e.stopPropagation(); setCart(prev => prev.map(i => i.id === item.id ? { ...i, quantity: Math.max(0, i.quantity - 1) } : i).filter(i => i.quantity > 0)); }}
-                                  >
-                                    <MinusCircle className="h-4 w-4" />
-                                  </Button>
-                                  <span className="font-bold w-6 text-center">{item.quantity}</span>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-6 w-6 rounded-lg bg-white shadow-sm"
-                                    onClick={(e) => { e.stopPropagation(); addToCart(item); }}
-                                  >
-                                    <PlusCircle className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <span className="font-bold text-primary block">₹{item.price * item.quantity}</span>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-
-                      <div className="p-8 bg-muted/5 border-t space-y-6">
-                        <div className="space-y-3">
-                          <div className="flex justify-between text-muted-foreground font-medium">
-                            <span>Subtotal</span>
-                            <span>₹{cart.reduce((acc, i) => acc + (i.price * i.quantity), 0)}</span>
-                          </div>
-                          <div className="flex justify-between text-muted-foreground font-medium">
-                            <span>Tax (GST 5%)</span>
-                            <span>₹{(cart.reduce((acc, i) => acc + (i.price * i.quantity), 0) * 0.05).toFixed(0)}</span>
-                          </div>
-                          <div className="flex justify-between text-3xl font-serif font-bold text-primary pt-2 border-t border-primary/10">
-                            <span>Total</span>
-                            <span>₹{(cart.reduce((acc, i) => acc + (i.price * i.quantity), 0) * 1.05).toFixed(0)}</span>
-                          </div>
-                        </div>
-                        <Button 
-                          className="w-full h-16 rounded-[1.5rem] text-xl font-bold shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all" 
-                          disabled={cart.length === 0} 
-                          onClick={placeOrder}
+                    <div className="flex-1 overflow-y-auto grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
+                      {filteredMenu.map(item => (
+                        <motion.div
+                          key={item.id}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                         >
-                          <CheckCircle2 className="mr-2 h-6 w-6" />
-                          PLACE ORDER
-                        </Button>
-                      </div>
+                          <Card
+                            className="rounded-[2rem] border-2 hover:border-primary transition-all p-5 flex flex-col gap-4 cursor-pointer h-full group bg-white shadow-sm hover:shadow-xl"
+                            onClick={() => addToCart(item)}
+                          >
+                            <div className="aspect-square w-full rounded-2xl bg-muted overflow-hidden relative">
+                              <img src={item.image_url || "/placeholder-food.jpg"} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                              <div className="absolute top-3 right-3 h-10 w-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                                <Plus className="h-6 w-6 text-primary" />
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="font-bold text-lg leading-tight">{item.name}</h4>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{item.category}</span>
+                                <span className="text-xl font-serif font-bold text-primary">₹{item.price}</span>
+                              </div>
+                            </div>
+                          </Card>
+                        </motion.div>
+                      ))}
                     </div>
                   </div>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-20 bg-white/50">
-                    <div className="relative mb-8">
-                      <div className="h-32 w-32 rounded-full bg-primary/5 flex items-center justify-center animate-pulse">
-                        <Play className="h-16 w-16 text-primary fill-primary/20" />
-                      </div>
-                      <div className="absolute -bottom-2 -right-2 h-12 w-12 rounded-2xl bg-white shadow-lg flex items-center justify-center text-2xl font-serif font-bold text-primary border-2 border-primary/10">
-                        {selectedTable.table_number}
-                      </div>
+
+                  {/* Cart Section */}
+                  <div className="w-[400px] bg-white border-l flex flex-col shadow-2xl z-10">
+                    <div className="p-8 border-b bg-muted/5 flex items-center justify-between">
+                      <h3 className="text-2xl font-serif font-bold flex items-center gap-3">
+                        <ShoppingCart className="h-6 w-6 text-primary" />
+                        Live Cart
+                      </h3>
+                      <Badge className="bg-primary/10 text-primary h-8 px-4 rounded-full font-bold">{cart.reduce((acc, i) => acc + i.quantity, 0)} Items</Badge>
                     </div>
-                    <h3 className="text-3xl font-serif font-bold mb-4 italic text-primary">Table {selectedTable.table_number} is ready</h3>
-                    <p className="text-muted-foreground max-w-sm mx-auto mb-10 text-lg">Start a new session to begin taking orders for this table. This will generate a temporary token for the customer QR code.</p>
-                    <Button 
-                      className="rounded-2xl h-16 px-12 font-bold text-2xl shadow-2xl shadow-primary/20 flex items-center gap-4" 
-                      onClick={() => openSession(selectedTable.id)}
-                    >
-                      <Plus className="h-8 w-8" />
-                      START NEW SESSION
-                    </Button>
+
+                    <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                      {cart.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-center opacity-30">
+                          <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-4">
+                            <Plus className="h-10 w-10" />
+                          </div>
+                          <p className="font-serif italic text-lg">Your cart is empty</p>
+                        </div>
+                      ) : (
+                        cart.map(item => (
+                          <div key={item.id} className="flex gap-4 items-center bg-muted/20 p-5 rounded-[1.5rem] group relative">
+                            <div className="h-14 w-14 rounded-xl bg-muted overflow-hidden shrink-0">
+                              <img src={item.image_url || "/placeholder-food.jpg"} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-bold text-sm truncate">{item.name}</h4>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 rounded-lg bg-white shadow-sm"
+                                  onClick={(e) => { e.stopPropagation(); setCart(prev => prev.map(i => i.id === item.id ? { ...i, quantity: Math.max(0, i.quantity - 1) } : i).filter(i => i.quantity > 0)); }}
+                                >
+                                  <MinusCircle className="h-4 w-4" />
+                                </Button>
+                                <span className="font-bold w-6 text-center">{item.quantity}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 rounded-lg bg-white shadow-sm"
+                                  onClick={(e) => { e.stopPropagation(); addToCart(item); }}
+                                >
+                                  <PlusCircle className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-bold text-primary block">₹{item.price * item.quantity}</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="p-8 bg-muted/5 border-t space-y-6">
+                      <div className="space-y-3">
+                        <div className="flex justify-between text-muted-foreground font-medium">
+                          <span>Subtotal</span>
+                          <span>₹{cart.reduce((acc, i) => acc + (i.price * i.quantity), 0)}</span>
+                        </div>
+                        <div className="flex justify-between text-muted-foreground font-medium">
+                          <span>Tax (GST 5%)</span>
+                          <span>₹{(cart.reduce((acc, i) => acc + (i.price * i.quantity), 0) * 0.05).toFixed(0)}</span>
+                        </div>
+                        <div className="flex justify-between text-3xl font-serif font-bold text-primary pt-2 border-t border-primary/10">
+                          <span>Total</span>
+                          <span>₹{(cart.reduce((acc, i) => acc + (i.price * i.quantity), 0) * 1.05).toFixed(0)}</span>
+                        </div>
+                      </div>
+                      <Button
+                        className="w-full h-16 rounded-[1.5rem] text-xl font-bold shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        disabled={cart.length === 0}
+                        onClick={placeOrder}
+                      >
+                        <CheckCircle2 className="mr-2 h-6 w-6" />
+                        PLACE ORDER
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-20 bg-white/50">
+                  <div className="relative mb-8">
+                    <div className="h-32 w-32 rounded-full bg-primary/5 flex items-center justify-center animate-pulse">
+                      <Play className="h-16 w-16 text-primary fill-primary/20" />
+                    </div>
+                    <div className="absolute -bottom-2 -right-2 h-12 w-12 rounded-2xl bg-white shadow-lg flex items-center justify-center text-2xl font-serif font-bold text-primary border-2 border-primary/10">
+                      {selectedTable.table_number}
+                    </div>
+                  </div>
+                  <h3 className="text-3xl font-serif font-bold mb-4 italic text-primary">Table {selectedTable.table_number} is ready</h3>
+                  <p className="text-muted-foreground max-w-sm mx-auto mb-10 text-lg">Start a new session to begin taking orders for this table. This will generate a temporary token for the customer QR code.</p>
+                  <Button
+                    className="rounded-2xl h-16 px-12 font-bold text-2xl shadow-2xl shadow-primary/20 flex items-center gap-4"
+                    onClick={() => {
+                      setOpeningTableId(selectedTable.id);
+                      setShowOpenSessionModal(true);
+                    }}
+                  >
+                    <Plus className="h-8 w-8" />
+                    START NEW SESSION
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -830,14 +833,14 @@ export default function CombinedTablesPage() {
     <div className="space-y-6">
       <div className="flex justify-center">
         <div className="bg-white p-1 rounded-2xl border shadow-sm flex gap-1">
-          <Button 
+          <Button
             variant={activeView === "console" ? "default" : "ghost"}
             onClick={() => setActiveView("console")}
             className="rounded-xl px-6 font-bold"
           >
             Ordering Console
           </Button>
-          <Button 
+          <Button
             variant={activeView === "management" ? "default" : "ghost"}
             onClick={() => setActiveView("management")}
             className="rounded-xl px-6 font-bold"

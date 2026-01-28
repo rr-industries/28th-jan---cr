@@ -3,11 +3,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAdmin } from "@/context/AdminContext";
-import { 
-  TrendingUp, 
-  ShoppingBag, 
-  Users, 
-  CreditCard, 
+import {
+  TrendingUp,
+  ShoppingBag,
+  Users,
+  CreditCard,
   Calendar,
   Download,
   Filter,
@@ -32,6 +32,7 @@ import {
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const BarChart = dynamic(() => import("recharts").then((mod) => mod.BarChart), { ssr: false });
 const Bar = dynamic(() => import("recharts").then((mod) => mod.Bar), { ssr: false });
@@ -56,12 +57,12 @@ export default function AdminReports() {
 
   const fetchReportData = useCallback(async () => {
     if (!selectedOutlet) return;
-    
+
     setLoading(true);
     try {
       let startDate = new Date();
       startDate.setHours(0, 0, 0, 0);
-      
+
       const now = new Date();
       if (timeRange === "week") {
         startDate.setDate(now.getDate() - 7);
@@ -94,11 +95,11 @@ export default function AdminReports() {
       const safeOrders = orders || [];
       const completedOrders = safeOrders.filter(o => o.status === 'completed');
       const cancelledOrders = safeOrders.filter(o => o.status === 'cancelled');
-      
+
       const grossRevenue = completedOrders.reduce((acc, o) => acc + (Number(o.total_amount || o.total_price) || 0), 0);
       const totalOrders = completedOrders.length;
       const aov = totalOrders > 0 ? grossRevenue / totalOrders : 0;
-      
+
       const totalTax = grossRevenue - (grossRevenue / 1.05);
       const cgst = totalTax / 2;
       const sgst = totalTax / 2;
@@ -130,7 +131,7 @@ export default function AdminReports() {
           const cat = oi.menu_items?.category || "Misc";
           const qty = Number(oi.quantity) || 0;
           const price = Number(oi.price_at_time || oi.menu_items?.price) || 0;
-          
+
           itemSalesMap.set(name, (itemSalesMap.get(name) || 0) + qty);
           categorySalesMap.set(cat, (categorySalesMap.get(cat) || 0) + (qty * price));
         });
@@ -209,7 +210,7 @@ export default function AdminReports() {
       <div className="flex justify-between items-center bg-white p-4 rounded-3xl border shadow-sm overflow-x-auto no-scrollbar gap-4">
         <div className="flex gap-2 min-w-max">
           {["today", "week", "month", "six_month", "year"].map((range) => (
-            <Button 
+            <Button
               key={range}
               variant={timeRange === range ? "default" : "ghost"}
               onClick={() => setTimeRange(range)}
@@ -262,8 +263,8 @@ export default function AdminReports() {
               <AreaChart data={reportData.trends}>
                 <defs>
                   <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#7c2d12" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#7c2d12" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#7c2d12" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#7c2d12" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />

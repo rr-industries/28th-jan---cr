@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAdmin } from "@/context/AdminContext";
-import { 
-  Settings, 
+import {
+  Settings,
   Save,
   LoaderCircle,
   Shield,
@@ -55,7 +55,7 @@ export default function AdminSettings() {
         .single();
 
       if (error) throw error;
-      
+
       setOutletInfo({
         name: data.name,
         address: data.address,
@@ -65,7 +65,7 @@ export default function AdminSettings() {
         status: data.status || "Active",
         access_pin_hash: data.access_pin_hash || ""
       });
-      
+
       setSettings(data.settings || {});
     } catch (error) {
       console.error(error);
@@ -78,7 +78,7 @@ export default function AdminSettings() {
   const handleSave = async () => {
     if (!selectedOutlet) return;
     setSaving(true);
-    
+
     try {
       const { error } = await supabase
         .from("outlets")
@@ -104,7 +104,7 @@ export default function AdminSettings() {
         target: "outlets",
         metadata: {
           outlet_name: outletInfo.name,
-          changed_by: user?.full_name,
+          changed_by: user?.name,
           timestamp: new Date().toISOString()
         }
       });
@@ -158,8 +158,8 @@ export default function AdminSettings() {
           </h1>
           <p className="text-muted-foreground mt-1">Manage everything for <span className="font-bold text-foreground">{selectedOutlet?.name}</span></p>
         </div>
-        <Button 
-          onClick={handleSave} 
+        <Button
+          onClick={handleSave}
           disabled={saving}
           className="h-12 px-8 rounded-full font-bold shadow-lg shadow-primary/20"
         >
@@ -220,50 +220,50 @@ export default function AdminSettings() {
             <CardContent className="p-8 grid gap-8 md:grid-cols-2">
               <div className="space-y-3">
                 <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Outlet Name</Label>
-                <Input 
+                <Input
                   value={outletInfo.name}
-                  onChange={(e) => setOutletInfo({...outletInfo, name: e.target.value})}
+                  onChange={(e) => setOutletInfo({ ...outletInfo, name: e.target.value })}
                   className="rounded-xl h-12"
                 />
               </div>
               <div className="space-y-3">
                 <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Outlet Code</Label>
-                <Input 
+                <Input
                   value={outletInfo.code}
-                  onChange={(e) => setOutletInfo({...outletInfo, code: e.target.value})}
+                  onChange={(e) => setOutletInfo({ ...outletInfo, code: e.target.value })}
                   placeholder="e.g. CR-001"
                   className="rounded-xl h-12"
                 />
               </div>
               <div className="space-y-3 md:col-span-2">
                 <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Full Address</Label>
-                <Input 
+                <Input
                   value={outletInfo.address}
-                  onChange={(e) => setOutletInfo({...outletInfo, address: e.target.value})}
+                  onChange={(e) => setOutletInfo({ ...outletInfo, address: e.target.value })}
                   className="rounded-xl h-12"
                 />
               </div>
               <div className="space-y-3">
                 <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Contact Phone</Label>
-                <Input 
+                <Input
                   value={outletInfo.phone}
-                  onChange={(e) => setOutletInfo({...outletInfo, phone: e.target.value})}
+                  onChange={(e) => setOutletInfo({ ...outletInfo, phone: e.target.value })}
                   className="rounded-xl h-12"
                 />
               </div>
               <div className="space-y-3">
                 <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Contact Email</Label>
-                <Input 
+                <Input
                   value={outletInfo.email}
-                  onChange={(e) => setOutletInfo({...outletInfo, email: e.target.value})}
+                  onChange={(e) => setOutletInfo({ ...outletInfo, email: e.target.value })}
                   className="rounded-xl h-12"
                 />
               </div>
               <div className="space-y-3">
                 <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Outlet Status</Label>
-                <Select 
+                <Select
                   value={outletInfo.status}
-                  onValueChange={(v) => setOutletInfo({...outletInfo, status: v})}
+                  onValueChange={(v) => setOutletInfo({ ...outletInfo, status: v })}
                 >
                   <SelectTrigger className="rounded-xl h-12">
                     <SelectValue />
@@ -290,10 +290,10 @@ export default function AdminSettings() {
               <div className="grid md:grid-cols-2 gap-8">
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Outlet PIN (6 Digits)</Label>
-                  <Input 
+                  <Input
                     type="password"
                     value={outletInfo.access_pin_hash}
-                    onChange={(e) => setOutletInfo({...outletInfo, access_pin_hash: e.target.value})}
+                    onChange={(e) => setOutletInfo({ ...outletInfo, access_pin_hash: e.target.value })}
                     maxLength={6}
                     className="rounded-xl h-14 text-center text-3xl font-mono tracking-widest"
                   />
@@ -303,8 +303,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Enable Outlet Login</Label>
                     <p className="text-xs text-muted-foreground">Require PIN for staff to access this outlet</p>
                   </div>
-                  <Switch 
-                    checked={settings.security?.login_enabled} 
+                  <Switch
+                    checked={settings.security?.login_enabled}
                     onCheckedChange={(v) => updateSetting("security", "login_enabled", v)}
                   />
                 </div>
@@ -313,7 +313,7 @@ export default function AdminSettings() {
               <div className="grid md:grid-cols-2 gap-8">
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Session Timeout (Minutes)</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.security?.session_timeout}
                     onChange={(e) => updateSetting("security", "session_timeout", parseInt(e.target.value))}
@@ -322,7 +322,7 @@ export default function AdminSettings() {
                 </div>
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Max Failed Attempts</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.security?.max_failed_attempts}
                     onChange={(e) => updateSetting("security", "max_failed_attempts", parseInt(e.target.value))}
@@ -344,7 +344,7 @@ export default function AdminSettings() {
             <CardContent className="p-8 grid gap-8 md:grid-cols-2">
               <div className="space-y-3">
                 <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Opening Time</Label>
-                <Input 
+                <Input
                   type="time"
                   value={settings.operating?.opening_time}
                   onChange={(e) => updateSetting("operating", "opening_time", e.target.value)}
@@ -353,7 +353,7 @@ export default function AdminSettings() {
               </div>
               <div className="space-y-3">
                 <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Closing Time</Label>
-                <Input 
+                <Input
                   type="time"
                   value={settings.operating?.closing_time}
                   onChange={(e) => updateSetting("operating", "closing_time", e.target.value)}
@@ -362,7 +362,7 @@ export default function AdminSettings() {
               </div>
               <div className="space-y-3">
                 <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Order Cut-off Time</Label>
-                <Input 
+                <Input
                   type="time"
                   value={settings.operating?.cutoff_time}
                   onChange={(e) => updateSetting("operating", "cutoff_time", e.target.value)}
@@ -371,7 +371,7 @@ export default function AdminSettings() {
               </div>
               <div className="space-y-3">
                 <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Time Zone</Label>
-                <Select 
+                <Select
                   value={settings.operating?.timezone}
                   onValueChange={(v) => updateSetting("operating", "timezone", v)}
                 >
@@ -399,7 +399,7 @@ export default function AdminSettings() {
               <div className="grid md:grid-cols-3 gap-8">
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Number of Tables</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.tables?.total_tables}
                     onChange={(e) => updateSetting("tables", "total_tables", parseInt(e.target.value))}
@@ -408,7 +408,7 @@ export default function AdminSettings() {
                 </div>
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Naming Format</Label>
-                  <Input 
+                  <Input
                     value={settings.tables?.naming_format}
                     onChange={(e) => updateSetting("tables", "naming_format", e.target.value)}
                     placeholder="e.g. T-"
@@ -417,7 +417,7 @@ export default function AdminSettings() {
                 </div>
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Auto-Close Idle (Mins)</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.tables?.auto_close_idle}
                     onChange={(e) => updateSetting("tables", "auto_close_idle", parseInt(e.target.value))}
@@ -432,8 +432,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Allow Table Merge</Label>
                     <p className="text-xs text-muted-foreground">Allow joining tables for large groups</p>
                   </div>
-                  <Switch 
-                    checked={settings.tables?.allow_merge} 
+                  <Switch
+                    checked={settings.tables?.allow_merge}
                     onCheckedChange={(v) => updateSetting("tables", "allow_merge", v)}
                   />
                 </div>
@@ -442,8 +442,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Require Staff to Open</Label>
                     <p className="text-xs text-muted-foreground">Only staff can open new table sessions</p>
                   </div>
-                  <Switch 
-                    checked={settings.tables?.require_staff_open} 
+                  <Switch
+                    checked={settings.tables?.require_staff_open}
                     onCheckedChange={(v) => updateSetting("tables", "require_staff_open", v)}
                   />
                 </div>
@@ -466,8 +466,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Allow QR Ordering</Label>
                     <p className="text-xs text-muted-foreground">Customers can order via scanning QR</p>
                   </div>
-                  <Switch 
-                    checked={settings.ordering?.allow_qr_ordering} 
+                  <Switch
+                    checked={settings.ordering?.allow_qr_ordering}
                     onCheckedChange={(v) => updateSetting("ordering", "allow_qr_ordering", v)}
                   />
                 </div>
@@ -476,8 +476,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Staff Approval Required</Label>
                     <p className="text-xs text-muted-foreground">Customer orders must be approved by staff</p>
                   </div>
-                  <Switch 
-                    checked={settings.ordering?.staff_approval_required} 
+                  <Switch
+                    checked={settings.ordering?.staff_approval_required}
                     onCheckedChange={(v) => updateSetting("ordering", "staff_approval_required", v)}
                   />
                 </div>
@@ -486,7 +486,7 @@ export default function AdminSettings() {
               <div className="grid md:grid-cols-3 gap-8">
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Max Orders / Session</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.ordering?.max_orders_per_table}
                     onChange={(e) => updateSetting("ordering", "max_orders_per_table", parseInt(e.target.value))}
@@ -495,7 +495,7 @@ export default function AdminSettings() {
                 </div>
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Rate Limit (Orders/Min)</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.ordering?.rate_limit_per_session}
                     onChange={(e) => updateSetting("ordering", "rate_limit_per_session", parseInt(e.target.value))}
@@ -504,7 +504,7 @@ export default function AdminSettings() {
                 </div>
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Session Expiry (Mins)</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.ordering?.auto_expire_session}
                     onChange={(e) => updateSetting("ordering", "auto_expire_session", parseInt(e.target.value))}
@@ -530,8 +530,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Enable KDS</Label>
                     <p className="text-xs text-muted-foreground">Kitchen Display System for chefs</p>
                   </div>
-                  <Switch 
-                    checked={settings.kitchen?.enable_kds} 
+                  <Switch
+                    checked={settings.kitchen?.enable_kds}
                     onCheckedChange={(v) => updateSetting("kitchen", "enable_kds", v)}
                   />
                 </div>
@@ -540,8 +540,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Sound Alerts</Label>
                     <p className="text-xs text-muted-foreground">Play sound for new incoming orders</p>
                   </div>
-                  <Switch 
-                    checked={settings.kitchen?.sound_alerts} 
+                  <Switch
+                    checked={settings.kitchen?.sound_alerts}
                     onCheckedChange={(v) => updateSetting("kitchen", "sound_alerts", v)}
                   />
                 </div>
@@ -550,8 +550,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Auto-Generate KOT</Label>
                     <p className="text-xs text-muted-foreground">Print KOT automatically on approval</p>
                   </div>
-                  <Switch 
-                    checked={settings.kitchen?.auto_kot_on_approval} 
+                  <Switch
+                    checked={settings.kitchen?.auto_kot_on_approval}
                     onCheckedChange={(v) => updateSetting("kitchen", "auto_kot_on_approval", v)}
                   />
                 </div>
@@ -560,8 +560,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Separate KOT for Add-ons</Label>
                     <p className="text-xs text-muted-foreground">Generate new KOT for item additions</p>
                   </div>
-                  <Switch 
-                    checked={settings.kitchen?.separate_kot_addons} 
+                  <Switch
+                    checked={settings.kitchen?.separate_kot_addons}
                     onCheckedChange={(v) => updateSetting("kitchen", "separate_kot_addons", v)}
                   />
                 </div>
@@ -584,8 +584,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Enable Taxes (GST)</Label>
                     <p className="text-xs text-muted-foreground">Apply taxes on all bills</p>
                   </div>
-                  <Switch 
-                    checked={settings.billing?.enable_taxes} 
+                  <Switch
+                    checked={settings.billing?.enable_taxes}
                     onCheckedChange={(v) => updateSetting("billing", "enable_taxes", v)}
                   />
                 </div>
@@ -594,8 +594,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Allow Manual Discount</Label>
                     <p className="text-xs text-muted-foreground">Cashiers can apply custom discounts</p>
                   </div>
-                  <Switch 
-                    checked={settings.billing?.allow_manual_discount} 
+                  <Switch
+                    checked={settings.billing?.allow_manual_discount}
                     onCheckedChange={(v) => updateSetting("billing", "allow_manual_discount", v)}
                   />
                 </div>
@@ -604,7 +604,7 @@ export default function AdminSettings() {
               <div className="grid md:grid-cols-3 gap-8">
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">GST %</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.billing?.gst_percentage}
                     onChange={(e) => updateSetting("billing", "gst_percentage", parseFloat(e.target.value))}
@@ -613,7 +613,7 @@ export default function AdminSettings() {
                 </div>
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Service Charge %</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.billing?.service_charge}
                     onChange={(e) => updateSetting("billing", "service_charge", parseFloat(e.target.value))}
@@ -622,7 +622,7 @@ export default function AdminSettings() {
                 </div>
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Max Discount %</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.billing?.max_discount}
                     onChange={(e) => updateSetting("billing", "max_discount", parseFloat(e.target.value))}
@@ -647,7 +647,7 @@ export default function AdminSettings() {
                 <div className="flex flex-wrap gap-4">
                   {["Cash", "UPI", "Card", "Wallet"].map((mode) => (
                     <div key={mode} className="flex items-center gap-2 p-4 bg-muted/30 rounded-xl border-2 border-transparent hover:border-primary/20 cursor-pointer">
-                      <Switch 
+                      <Switch
                         checked={settings.payments?.allowed_modes.includes(mode)}
                         onCheckedChange={(v) => {
                           const modes = [...settings.payments.allowed_modes];
@@ -668,8 +668,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Allow Partial Payments</Label>
                     <p className="text-xs text-muted-foreground">Split bill between different modes</p>
                   </div>
-                  <Switch 
-                    checked={settings.payments?.allow_partial} 
+                  <Switch
+                    checked={settings.payments?.allow_partial}
                     onCheckedChange={(v) => updateSetting("payments", "allow_partial", v)}
                   />
                 </div>
@@ -678,8 +678,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Refund Approval Required</Label>
                     <p className="text-xs text-muted-foreground">Only Admins can approve refunds</p>
                   </div>
-                  <Switch 
-                    checked={settings.payments?.refund_approval_required} 
+                  <Switch
+                    checked={settings.payments?.refund_approval_required}
                     onCheckedChange={(v) => updateSetting("payments", "refund_approval_required", v)}
                   />
                 </div>
@@ -702,8 +702,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Auto Stock Deduction</Label>
                     <p className="text-xs text-muted-foreground">Deduct stock automatically on order</p>
                   </div>
-                  <Switch 
-                    checked={settings.inventory?.auto_deduction} 
+                  <Switch
+                    checked={settings.inventory?.auto_deduction}
                     onCheckedChange={(v) => updateSetting("inventory", "auto_deduction", v)}
                   />
                 </div>
@@ -712,8 +712,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Allow Negative Stock</Label>
                     <p className="text-xs text-muted-foreground">Continue sales even if stock is zero</p>
                   </div>
-                  <Switch 
-                    checked={settings.inventory?.allow_negative_stock} 
+                  <Switch
+                    checked={settings.inventory?.allow_negative_stock}
                     onCheckedChange={(v) => updateSetting("inventory", "allow_negative_stock", v)}
                   />
                 </div>
@@ -722,7 +722,7 @@ export default function AdminSettings() {
               <div className="grid md:grid-cols-2 gap-8">
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Low-Stock Alert Threshold</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.inventory?.low_stock_threshold}
                     onChange={(e) => updateSetting("inventory", "low_stock_threshold", parseInt(e.target.value))}
@@ -734,8 +734,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Wastage Tracking</Label>
                     <p className="text-xs text-muted-foreground">Enable recording of wasted materials</p>
                   </div>
-                  <Switch 
-                    checked={settings.inventory?.wastage_tracking} 
+                  <Switch
+                    checked={settings.inventory?.wastage_tracking}
                     onCheckedChange={(v) => updateSetting("inventory", "wastage_tracking", v)}
                   />
                 </div>
@@ -758,8 +758,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Attendance Mandatory</Label>
                     <p className="text-xs text-muted-foreground">Staff must check-in to use the system</p>
                   </div>
-                  <Switch 
-                    checked={settings.staff?.attendance_mandatory} 
+                  <Switch
+                    checked={settings.staff?.attendance_mandatory}
                     onCheckedChange={(v) => updateSetting("staff", "attendance_mandatory", v)}
                   />
                 </div>
@@ -768,8 +768,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Shift Enforcement</Label>
                     <p className="text-xs text-muted-foreground">Staff can only login during their shift</p>
                   </div>
-                  <Switch 
-                    checked={settings.staff?.shift_enforcement} 
+                  <Switch
+                    checked={settings.staff?.shift_enforcement}
                     onCheckedChange={(v) => updateSetting("staff", "shift_enforcement", v)}
                   />
                 </div>
@@ -778,7 +778,7 @@ export default function AdminSettings() {
               <div className="grid md:grid-cols-2 gap-8">
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Late Mark Grace Time (Mins)</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.staff?.late_grace_time}
                     onChange={(e) => updateSetting("staff", "late_grace_time", parseInt(e.target.value))}
@@ -790,8 +790,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold">Overtime Calculation</Label>
                     <p className="text-xs text-muted-foreground">Automatically calculate extra hours</p>
                   </div>
-                  <Switch 
-                    checked={settings.staff?.overtime_calculation} 
+                  <Switch
+                    checked={settings.staff?.overtime_calculation}
                     onCheckedChange={(v) => updateSetting("staff", "overtime_calculation", v)}
                   />
                 </div>
@@ -811,7 +811,7 @@ export default function AdminSettings() {
               <div className="grid md:grid-cols-2 gap-8">
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Data Retention (Days)</Label>
-                  <Input 
+                  <Input
                     type="number"
                     value={settings.reports?.retention_period}
                     onChange={(e) => updateSetting("reports", "retention_period", parseInt(e.target.value))}
@@ -820,7 +820,7 @@ export default function AdminSettings() {
                 </div>
                 <div className="space-y-3">
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Daily Auto-Report Time</Label>
-                  <Input 
+                  <Input
                     type="time"
                     value={settings.reports?.auto_report_time}
                     onChange={(e) => updateSetting("reports", "auto_report_time", e.target.value)}
@@ -833,8 +833,8 @@ export default function AdminSettings() {
                   <Label className="text-base font-bold">Allow Data Export</Label>
                   <p className="text-xs text-muted-foreground">Enable CSV/PDF exports for reports</p>
                 </div>
-                <Switch 
-                  checked={settings.reports?.allow_export} 
+                <Switch
+                  checked={settings.reports?.allow_export}
                   onCheckedChange={(v) => updateSetting("reports", "allow_export", v)}
                 />
               </div>
@@ -860,13 +860,13 @@ export default function AdminSettings() {
                 </div>
               </div>
               <div className="p-8 space-y-6">
-                 <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-lg">System Logs Protection</h3>
-                    <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50">Enabled</Badge>
-                 </div>
-                 <div className="rounded-2xl border border-dashed p-6 text-center text-muted-foreground italic">
-                    Log data is non-negotiable and cannot be deleted by staff.
-                 </div>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-lg">System Logs Protection</h3>
+                  <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50">Enabled</Badge>
+                </div>
+                <div className="rounded-2xl border border-dashed p-6 text-center text-muted-foreground italic">
+                  Log data is non-negotiable and cannot be deleted by staff.
+                </div>
               </div>
             </CardContent>
           </Card>
