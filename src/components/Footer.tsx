@@ -65,7 +65,7 @@ export function Footer() {
             <ul className="space-y-4 text-secondary/70 font-medium">
               <li className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 shrink-0" />
-                <span>Wardha Rd, Chhatrapati Square, Nagpur - 440015</span>
+                <span>Wardha Rd, Nagpur - 440015</span>
               </li>
               <li className="flex items-center gap-3">
                 <Phone className="h-5 w-5 shrink-0" />
@@ -78,7 +78,7 @@ export function Footer() {
             </ul>
           </div>
         </div>
-        
+
         <div className="border-t border-secondary/10 pt-10 text-center text-secondary/50 text-sm font-medium">
           <p>&copy; {new Date().getFullYear()} Cafe Republic. All rights reserved<Link href="/admin/login" className="cursor-default opacity-0">.</Link> Crafted with Excellence.</p>
         </div>

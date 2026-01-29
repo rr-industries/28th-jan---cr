@@ -61,6 +61,7 @@ const adminNavGroups = [
       { label: "Menu", href: "/admin/menu", icon: MenuIcon },
       { label: "Inventory", href: "/admin/inventory", icon: Package },
       { label: "Employees", href: "/admin/employees", icon: Users },
+      { label: "Leaves", href: "/admin/leaves", icon: FileText },
     ]
   },
   {
@@ -77,8 +78,7 @@ const adminNavGroups = [
     items: [
       { label: "Admins", href: "/admin/admins", icon: ShieldCheck },
       { label: "Access Matrix", href: "/admin/access-matrix", icon: Shield },
-      { label: "Audit Logs", href: "/admin/audit-logs", icon: ShieldCheck },
-      { label: "Login History", href: "/admin/login-history", icon: History },
+      { label: "Security Center", href: "/admin/security", icon: ShieldCheck },
       { label: "Notifications", href: "/admin/notifications", icon: Bell },
     ]
   },

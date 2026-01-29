@@ -23,7 +23,7 @@ export default function ContactPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.firstName || !formData.email || !formData.message) {
       toast.error("Please fill in all required fields");
       return;
@@ -48,7 +48,7 @@ export default function ContactPage() {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         setMessageSent(true);
         setFormData({
@@ -71,7 +71,7 @@ export default function ContactPage() {
 
   return (
     <div className="flex flex-col pb-20 md:pb-0">
-      <PageHero 
+      <PageHero
         title="Contact Us"
         subtitle="We'd Love to Hear From You"
         backgroundImage="https://images.unsplash.com/photo-1559925393-8be0ec4767c8?q=80&w=2070&auto=format&fit=crop"
@@ -92,10 +92,10 @@ export default function ContactPage() {
                 Connectivity
               </div>
               <h2 className="mb-8 text-4xl md:text-5xl font-serif font-bold leading-tight">Get In <span className="text-primary italic">Touch</span></h2>
-              
+
               <div className="space-y-8">
                 {[
-                  { icon: MapPin, title: "Visit Us", desc: "Wardha Rd, Chhatrapati Square,\nNagpur, Maharashtra 440015" },
+                  { icon: MapPin, title: "Visit Us", desc: "Wardha Rd, Nagpur, Maharashtra 440015" },
                   { icon: Phone, title: "Call Us", desc: "+91 87888 39229", href: "tel:08788839229" },
                   { icon: Mail, title: "Email Us", desc: "hello@caferepublic.in", href: "mailto:hello@caferepublic.in" },
                   { icon: Clock, title: "Opening Hours", desc: "Mon - Thu: 7 AM - 10 PM\nFri - Sun: 7 AM - 11:30 PM" }
@@ -159,7 +159,7 @@ export default function ContactPage() {
                       <p className="mb-10 text-muted-foreground font-medium max-w-sm leading-relaxed">
                         Thank you for reaching out. Our team will review your inquiry and get back to you shortly.
                       </p>
-                      <Button 
+                      <Button
                         onClick={() => setMessageSent(false)}
                         variant="outline"
                         className="h-14 rounded-full px-8 font-bold"
@@ -176,13 +176,13 @@ export default function ContactPage() {
                       exit={{ opacity: 0 }}
                     >
                       <h2 className="mb-8 text-2xl font-serif font-bold">Send Us a <span className="text-primary italic">Message</span></h2>
-                      
+
                       <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="grid gap-6 sm:grid-cols-2">
                           <div className="space-y-2">
                             <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">First Name *</label>
-                            <Input 
-                              placeholder="John" 
+                            <Input
+                              placeholder="John"
                               className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-2 focus:ring-primary font-medium"
                               value={formData.firstName}
                               onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
@@ -191,30 +191,30 @@ export default function ContactPage() {
                           </div>
                           <div className="space-y-2">
                             <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Last Name</label>
-                            <Input 
-                              placeholder="Doe" 
+                            <Input
+                              placeholder="Doe"
                               className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-2 focus:ring-primary font-medium"
                               value={formData.lastName}
                               onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
                             />
                           </div>
                         </div>
-                        
+
                         <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Email *</label>
-                          <Input 
-                            type="email" 
-                            placeholder="john@example.com" 
+                          <Input
+                            type="email"
+                            placeholder="john@example.com"
                             className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-2 focus:ring-primary font-medium"
                             value={formData.email}
                             onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                             required
                           />
                         </div>
-                        
+
                         <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Subject</label>
-                          <select 
+                          <select
                             className="w-full h-14 rounded-2xl bg-muted/30 border-none px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary appearance-none"
                             value={formData.subject}
                             onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
@@ -225,11 +225,11 @@ export default function ContactPage() {
                             <option>Catering</option>
                           </select>
                         </div>
-                        
+
                         <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Message *</label>
-                          <textarea 
-                            rows={4} 
+                          <textarea
+                            rows={4}
                             placeholder="How can we help you today?"
                             className="w-full rounded-2xl bg-muted/30 border-none p-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary"
                             value={formData.message}
@@ -237,7 +237,7 @@ export default function ContactPage() {
                             required
                           />
                         </div>
-                        
+
                         <Button type="submit" className="w-full h-16 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20" disabled={sending}>
                           {sending ? (
                             <>
@@ -268,7 +268,7 @@ export default function ContactPage() {
             <h2 className="text-4xl font-serif font-bold">Find <span className="text-primary italic">Us</span></h2>
             <div className="mx-auto mt-4 h-1.5 w-24 bg-primary rounded-full shadow-lg" />
           </div>
-          
+
           <div className="overflow-hidden rounded-[3rem] shadow-2xl border-8 border-white">
             <iframe
               src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d29778.169142954062!2d79.0520846847656!3d21.10175361840597!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bd4bfb65bdf135d%3A0xbb418f447f8ae821!2sCafe%20Republic!5e0!3m2!1sen!2sin!4v1768764568815!5m2!1sen!2sin"
