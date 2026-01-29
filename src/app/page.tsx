@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { supabase } from "@/lib/supabase";
-import HeroSlider from "@/components/HeroSlider";
 import { TableBookingForm } from "@/components/TableBookingForm";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,11 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
+const HeroSlider = dynamic(() => import("@/components/HeroSlider"), {
+  ssr: false,
+  loading: () => <div className="w-full h-96 bg-muted animate-pulse" />
+});
+
 type MenuItem = {
   id: string;
   name: string;
@@ -34,8 +39,10 @@ type MenuItem = {
 
 export default function HomePage() {
   const [bestSellers, setBestSellers] = useState<MenuItem[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
+    setIsHydrated(true);
     fetchBestSellers();
   }, []);
 
@@ -51,7 +58,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" suppressHydrationWarning>
       {/* Hero Section */}
       <HeroSlider />
 

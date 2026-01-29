@@ -111,6 +111,7 @@ export default function HeroSlider() {
             key={index}
             className={`${styles.slide} ${getPositionClass(index)}`}
             onClick={() => goToSlide(index)}
+            suppressHydrationWarning
           >
             <Image
               src={image.src}
@@ -132,6 +133,7 @@ export default function HeroSlider() {
             className={styles.navArrow} 
             onClick={prevSlide}
             aria-label="Previous slide"
+            suppressHydrationWarning
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M15 18l-6-6 6-6" />
@@ -141,6 +143,7 @@ export default function HeroSlider() {
             className={styles.navArrow} 
             onClick={nextSlide}
             aria-label="Next slide"
+            suppressHydrationWarning
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 18l6-6-6-6" />

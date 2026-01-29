@@ -142,8 +142,10 @@ export default function AdminEmployees() {
   };
 
   useEffect(() => {
-    fetchInitialData();
-  }, []);
+    if (selectedOutlet) {
+      fetchInitialData();
+    }
+  }, [selectedOutlet]);
 
   useEffect(() => {
     if (searchParams.get('add') === 'true') {
@@ -648,6 +650,14 @@ export default function AdminEmployees() {
       return (
         <div className="flex h-[60vh] items-center justify-center">
           <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
+    }
+
+    if (!selectedOutlet) {
+      return (
+        <div className="flex h-[60vh] items-center justify-center flex-col gap-4">
+          <p className="text-muted-foreground">Please select an outlet first</p>
         </div>
       );
     }

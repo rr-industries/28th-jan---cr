@@ -1,14 +1,6 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
-
-type Outlet = {
-  id: string;
-  name: string;
-  address: string;
-  phone: string;
-};
 
 type AdminUser = {
   id: string;
@@ -21,7 +13,6 @@ type AdminUser = {
 
 type AdminContextType = {
   user: AdminUser | null;
-  selectedOutlet: Outlet | null;
   permissions: Record<string, boolean>;
   hasPermission: (permission: string) => boolean;
   loading: boolean;
@@ -32,7 +23,6 @@ const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export function AdminProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AdminUser | null>(null);
-  const [selectedOutlet, setSelectedOutlet] = useState<Outlet | null>(null);
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
@@ -58,12 +48,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       };
 
       setUser(currentUserData);
-
-      const { data: outlets } = await supabase.from("outlets").select("*").limit(1);
-      if (outlets && outlets.length > 0) {
-        setSelectedOutlet(outlets[0]);
-        setPermissions({ "*": true });
-      }
+      setPermissions({ "*": true });
     } catch (error) {
       console.error("Error fetching admin data:", error);
     } finally {
@@ -76,7 +61,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   }, [fetchUserAndPermissions]);
 
   const hasPermission = (permissionKey: string) => {
-    return true; // Simplified for single-outlet CAFE REPUBLIC
+    return true;
   };
 
   const refreshPermissions = async () => {
@@ -86,7 +71,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   return (
     <AdminContext.Provider value={{
       user,
-      selectedOutlet,
       permissions,
       hasPermission,
       loading,
