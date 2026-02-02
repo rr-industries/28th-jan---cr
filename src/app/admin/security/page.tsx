@@ -205,7 +205,7 @@ export default function SecurityCenter() {
             setAlerts(data || []);
         } catch (error: any) {
             const isRLSError = Object.keys(error || {}).length === 0 || error.code === '42501';
-            console.error('Failed to fetch alerts:', { error, isRLSError });
+            console.error('Failed to fetch alerts:', { error: error?.toString?.() || error, isRLSError });
             if (isRLSError) {
                 toast.error("Permission denied by system security rules.");
             }

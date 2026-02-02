@@ -397,7 +397,7 @@ export default function PayrollPage() {
                 : error.message || "An unexpected error occurred while generating payroll";
 
             console.error("Error generating payroll:", {
-                error,
+                error: error?.toString?.() || error,
                 isRLSError,
                 message,
                 employee: selectedEmployee?.name,

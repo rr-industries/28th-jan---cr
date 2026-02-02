@@ -203,7 +203,7 @@ export default function LeaveManagement() {
                 ? "Permission denied by system security rules. Please contact admin."
                 : e.message || "Failed to submit leave";
 
-            console.error("Leave submission error:", { e, isRLSError, message });
+            console.error("Leave submission error:", { error: e?.toString?.() || e, isRLSError, message });
             toast.error(message);
         }
     };

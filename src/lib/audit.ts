@@ -163,7 +163,11 @@ async function logAudit(entry: AuditLogEntry) {
                 ? "Permission denied by system security rules. Please contact admin."
                 : error.message || "Failed to log audit entry";
 
-            console.error('Audit Log Error:', { error, isRLSError, message });
+            if (isRLSError) {
+                // Skip logging empty RLS errors to console
+            } else {
+                console.error('Audit Log Error:', { error: error?.toString?.() || error, isRLSError, message });
+            }
             return { success: false, error: { ...error, message } };
         }
 
