@@ -75,7 +75,7 @@ type Order = {
 };
 
 export default function AllOrdersPage() {
-    const { selectedOutlet, hasPermission } = useAdmin();
+    const { selectedOutlet, user, hasPermission } = useAdmin();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
@@ -98,7 +98,7 @@ export default function AllOrdersPage() {
         if (!selectedOutlet) return;
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from("orders")
                 .select(`
           *,
@@ -113,9 +113,13 @@ export default function AllOrdersPage() {
             bill_number,
             payment_status
           )
-        `)
-                .eq("outlet_id", selectedOutlet.id)
-                .order("created_at", { ascending: false });
+        `);
+
+            if (!user?.is_super_admin) {
+                query = query.eq("outlet_id", selectedOutlet.id);
+            }
+
+            const { data, error } = await query.order("created_at", { ascending: false });
 
             if (error) throw error;
             setOrders(data || []);

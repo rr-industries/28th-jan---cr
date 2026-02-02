@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { 
-  ShoppingBag, 
-  Clock, 
-  CheckCircle2, 
-  ChefHat, 
+import {
+  ShoppingBag,
+  Clock,
+  CheckCircle2,
+  ChefHat,
   RefreshCw,
   MoreVertical,
   Printer,
@@ -50,7 +50,7 @@ type Order = {
 };
 
 export default function LiveOrdersPage() {
-  const { selectedOutlet, hasPermission } = useAdmin();
+  const { selectedOutlet, user, hasPermission } = useAdmin();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -58,13 +58,20 @@ export default function LiveOrdersPage() {
     if (!selectedOutlet) return;
     fetchLiveOrders();
 
+    let filter = `outlet_id=eq.${selectedOutlet.id}`;
+    if (user?.is_super_admin) {
+      filter = "outlet_id=not.is.null"; // Or just omit filter if allowed, but this is safer for realtime channel syntax usually
+      // Actually, many times you want to omit the filter for all. 
+      // But Supabase JS client filter syntax for 'all' is tricky in one-liner.
+    }
+
     const channel = supabase
       .channel(`live_orders_${selectedOutlet.id}`)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
         table: 'orders',
-        filter: `outlet_id=eq.${selectedOutlet.id}`
+        filter: user?.is_super_admin ? undefined : filter
       }, fetchLiveOrders)
       .subscribe();
 
@@ -75,7 +82,7 @@ export default function LiveOrdersPage() {
 
   const fetchLiveOrders = async () => {
     if (!selectedOutlet) return;
-    const { data, error } = await supabase
+    let query = supabase
       .from("orders")
       .select(`
         *,
@@ -86,8 +93,13 @@ export default function LiveOrdersPage() {
           menu_items (name, image_url)
         )
       `)
-      .eq("outlet_id", selectedOutlet.id)
-      .not("status", "in", '("completed","cancelled")')
+      .not("status", "in", '("completed","cancelled")');
+
+    if (!user?.is_super_admin) {
+      query = query.eq("outlet_id", selectedOutlet.id);
+    }
+
+    const { data, error } = await query
       .order("is_approved", { ascending: true }) // Show unapproved first
       .order("created_at", { ascending: true });
 
@@ -95,82 +107,82 @@ export default function LiveOrdersPage() {
     setLoading(false);
   };
 
-    const approveOrder = async (orderId: string) => {
-      if (!hasPermission("orders.live.update")) return toast.error("Permission denied");
-      const order = orders.find(o => o.id === orderId);
-      const { error } = await supabase
-        .from("orders")
-        .update({ is_approved: true, status: 'preparing' })
-        .eq("id", orderId);
-  
-      if (error) toast.error("Failed to approve order");
-      else {
-        // Notify Customer
+  const approveOrder = async (orderId: string) => {
+    if (!hasPermission("orders.live.update")) return toast.error("Permission denied");
+    const order = orders.find(o => o.id === orderId);
+    const { error } = await supabase
+      .from("orders")
+      .update({ is_approved: true, status: 'preparing' })
+      .eq("id", orderId);
+
+    if (error) toast.error("Failed to approve order");
+    else {
+      // Notify Customer
+      await createNotification({
+        title: "Order Confirmed",
+        message: `Your order from Table ${order?.table_number} has been approved and is being prepared.`,
+        type: "success",
+        category: "customer",
+        reference_id: orderId,
+        reference_type: "order"
+      });
+
+      toast.success("Order approved and sent to kitchen");
+      fetchLiveOrders();
+    }
+  };
+
+  const rejectOrder = async (orderId: string) => {
+    if (!hasPermission("orders.live.update")) return toast.error("Permission denied");
+    const order = orders.find(o => o.id === orderId);
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: 'cancelled', rejection_reason: 'Rejected by staff' })
+      .eq("id", orderId);
+
+    if (error) toast.error("Failed to reject order");
+    else {
+      // Notify Customer
+      await createNotification({
+        title: "Order Cancelled",
+        message: `Your order from Table ${order?.table_number} has been cancelled.`,
+        type: "error",
+        category: "customer",
+        reference_id: orderId,
+        reference_type: "order"
+      });
+
+      toast.error("Order rejected");
+      fetchLiveOrders();
+    }
+  };
+
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    if (!hasPermission("orders.live.update")) return toast.error("Permission denied");
+    const order = orders.find(o => o.id === orderId);
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: newStatus })
+      .eq("id", orderId);
+
+    if (error) toast.error("Failed to update status");
+    else {
+      // Notify Customer if order is ready
+      if (newStatus === 'ready') {
         await createNotification({
-          title: "Order Confirmed",
-          message: `Your order from Table ${order?.table_number} has been approved and is being prepared.`,
+          title: "Your Order is Ready 🍽️",
+          message: `Order for Table ${order?.table_number} is ready to be served.`,
           type: "success",
+          priority: "high",
           category: "customer",
           reference_id: orderId,
           reference_type: "order"
         });
-
-        toast.success("Order approved and sent to kitchen");
-        fetchLiveOrders();
       }
-    };
 
-    const rejectOrder = async (orderId: string) => {
-      if (!hasPermission("orders.live.update")) return toast.error("Permission denied");
-      const order = orders.find(o => o.id === orderId);
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: 'cancelled', rejection_reason: 'Rejected by staff' })
-        .eq("id", orderId);
-  
-      if (error) toast.error("Failed to reject order");
-      else {
-        // Notify Customer
-        await createNotification({
-          title: "Order Cancelled",
-          message: `Your order from Table ${order?.table_number} has been cancelled.`,
-          type: "error",
-          category: "customer",
-          reference_id: orderId,
-          reference_type: "order"
-        });
-
-        toast.error("Order rejected");
-        fetchLiveOrders();
-      }
-    };
-
-    const updateOrderStatus = async (orderId: string, newStatus: string) => {
-      if (!hasPermission("orders.live.update")) return toast.error("Permission denied");
-      const order = orders.find(o => o.id === orderId);
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: newStatus })
-        .eq("id", orderId);
-  
-      if (error) toast.error("Failed to update status");
-      else {
-        // Notify Customer if order is ready
-        if (newStatus === 'ready') {
-          await createNotification({
-            title: "Your Order is Ready 🍽️",
-            message: `Order for Table ${order?.table_number} is ready to be served.`,
-            type: "success",
-            priority: "high",
-            category: "customer",
-            reference_id: orderId,
-            reference_type: "order"
-          });
-        }
-
-        toast.success(`Order is now ${newStatus}`);
-      }
-    };
+      toast.success(`Order is now ${newStatus}`);
+    }
+  };
 
   const updateItemStatus = async (itemId: string, newStatus: string) => {
     if (!hasPermission("kds.update.status")) return toast.error("Permission denied");
@@ -224,23 +236,23 @@ export default function LiveOrdersPage() {
               exit={{ opacity: 0, scale: 0.8 }}
               className={cn(
                 "flex flex-col bg-white rounded-[2.5rem] border-2 shadow-sm overflow-hidden transition-all",
-                order.status === 'new' ? "border-blue-200 ring-4 ring-blue-50" : 
-                order.status === 'ready' ? "border-green-200 ring-4 ring-green-50" : "border-muted"
+                order.status === 'new' ? "border-blue-200 ring-4 ring-blue-50" :
+                  order.status === 'ready' ? "border-green-200 ring-4 ring-green-50" : "border-muted"
               )}
             >
               {/* Header */}
               <div className={cn(
                 "p-6 flex justify-between items-start",
-                order.status === 'new' ? "bg-blue-50" : 
-                order.status === 'ready' ? "bg-green-50" : "bg-muted/30"
+                order.status === 'new' ? "bg-blue-50" :
+                  order.status === 'ready' ? "bg-green-50" : "bg-muted/30"
               )}>
                 <div>
                   <div className="flex items-center gap-3 mb-1">
                     <span className="text-3xl font-serif font-bold tracking-tighter">T-{order.table_number}</span>
                     <Badge className={cn(
                       "uppercase text-[10px] font-bold px-2 py-0.5",
-                      order.status === 'new' ? "bg-blue-500" : 
-                      order.status === 'ready' ? "bg-green-500" : "bg-orange-500"
+                      order.status === 'new' ? "bg-blue-500" :
+                        order.status === 'ready' ? "bg-green-500" : "bg-orange-500"
                     )}>
                       {order.status}
                     </Badge>
@@ -260,19 +272,19 @@ export default function LiveOrdersPage() {
               <div className="flex-1 p-6 space-y-4">
                 {order.order_items.map((item) => (
                   <div key={item.id} className="flex items-center justify-between group">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-muted rounded-2xl flex items-center justify-center font-bold text-lg text-primary/40">
-                          {item.quantity}
-                        </div>
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 bg-muted rounded-2xl flex items-center justify-center font-bold text-lg text-primary/40">
+                        {item.quantity}
+                      </div>
                       <div>
                         <p className="font-bold text-sm">{item.menu_items.name}</p>
                         <p className="text-[10px] text-muted-foreground font-medium uppercase">{item.status}</p>
                       </div>
                     </div>
                     {item.status !== 'ready' && order.status !== 'ready' && (
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         className="h-8 w-8 rounded-full hover:bg-green-50 hover:text-green-600 opacity-0 group-hover:opacity-100 transition-all"
                         onClick={() => updateItemStatus(item.id, 'ready')}
                       >
@@ -283,59 +295,59 @@ export default function LiveOrdersPage() {
                 ))}
               </div>
 
-                {/* Actions Footer */}
-                <div className="p-4 bg-muted/10 border-t flex flex-col gap-2">
-                  {!order.is_approved ? (
-                    <div className="flex gap-2">
-                      <Button 
+              {/* Actions Footer */}
+              <div className="p-4 bg-muted/10 border-t flex flex-col gap-2">
+                {!order.is_approved ? (
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 rounded-2xl bg-green-600 hover:bg-green-700 h-12 font-bold"
+                      onClick={() => approveOrder(order.id)}
+                    >
+                      <Check className="h-4 w-4 mr-2" />
+                      Approve
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1 rounded-2xl h-12 font-bold"
+                      onClick={() => rejectOrder(order.id)}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Reject
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    {order.status === 'new' && (
+                      <Button
+                        className="flex-1 rounded-2xl bg-blue-600 hover:bg-blue-700 h-12 font-bold"
+                        onClick={() => updateOrderStatus(order.id, 'preparing')}
+                      >
+                        Start Cooking
+                      </Button>
+                    )}
+                    {order.status === 'preparing' && (
+                      <Button
+                        className="flex-1 rounded-2xl bg-orange-600 hover:bg-orange-700 h-12 font-bold"
+                        onClick={() => updateOrderStatus(order.id, 'ready')}
+                      >
+                        Order Ready
+                      </Button>
+                    )}
+                    {order.status === 'ready' && (
+                      <Button
                         className="flex-1 rounded-2xl bg-green-600 hover:bg-green-700 h-12 font-bold"
-                        onClick={() => approveOrder(order.id)}
+                        onClick={() => updateOrderStatus(order.id, 'served')}
                       >
-                        <Check className="h-4 w-4 mr-2" />
-                        Approve
+                        Mark Served
                       </Button>
-                      <Button 
-                        variant="destructive"
-                        className="flex-1 rounded-2xl h-12 font-bold"
-                        onClick={() => rejectOrder(order.id)}
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        Reject
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      {order.status === 'new' && (
-                        <Button 
-                          className="flex-1 rounded-2xl bg-blue-600 hover:bg-blue-700 h-12 font-bold"
-                          onClick={() => updateOrderStatus(order.id, 'preparing')}
-                        >
-                          Start Cooking
-                        </Button>
-                      )}
-                      {order.status === 'preparing' && (
-                        <Button 
-                          className="flex-1 rounded-2xl bg-orange-600 hover:bg-orange-700 h-12 font-bold"
-                          onClick={() => updateOrderStatus(order.id, 'ready')}
-                        >
-                          Order Ready
-                        </Button>
-                      )}
-                      {order.status === 'ready' && (
-                        <Button 
-                          className="flex-1 rounded-2xl bg-green-600 hover:bg-green-700 h-12 font-bold"
-                          onClick={() => updateOrderStatus(order.id, 'served')}
-                        >
-                          Mark Served
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                  <Button variant="outline" className="w-full rounded-2xl h-10 border-dashed text-xs font-bold text-muted-foreground">
-                    <Printer className="h-3 w-3 mr-2" />
-                    Print KOT
-                  </Button>
-                </div>
+                    )}
+                  </div>
+                )}
+                <Button variant="outline" className="w-full rounded-2xl h-10 border-dashed text-xs font-bold text-muted-foreground">
+                  <Printer className="h-3 w-3 mr-2" />
+                  Print KOT
+                </Button>
+              </div>
 
             </motion.div>
           ))}

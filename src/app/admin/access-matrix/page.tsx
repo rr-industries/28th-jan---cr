@@ -202,31 +202,17 @@ export default function AccessMatrixPage() {
                             <User className="h-10 w-10 opacity-20" />
                         </div>
                         <h2 className="text-xl font-bold text-gray-900 mb-2">Select an Employee</h2>
-                        <p className="max-w-md text-sm font-medium">Choose an employee from the sidebar to configure their access rights and permissions across different outlets.</p>
+                        <p className="max-w-md text-sm font-medium">Choose an employee from the sidebar to configure their system-wide access rights and permissions.</p>
                     </div>
                 ) : (
                     <>
-                        {/* Header / Outlet Selector */}
+                        {/* Header / Actions */}
                         <div className="h-20 border-b bg-white px-8 flex items-center justify-between shrink-0">
-                            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar mask-gradient-x">
-                                {outlets.map(outlet => (
-                                    <button
-                                        key={outlet.id}
-                                        onClick={() => setSelectedOutlet(outlet)}
-                                        className={cn(
-                                            "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all border",
-                                            selectedOutlet?.id === outlet.id
-                                                ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
-                                                : "bg-white text-muted-foreground border-border hover:border-primary/30"
-                                        )}
-                                    >
-                                        <Store className="h-3.5 w-3.5" />
-                                        {outlet.name}
-                                    </button>
-                                ))}
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Manage Permissions</h3>
                             </div>
 
-                            <div className="flex items-center gap-4 pl-4 border-l ml-4">
+                            <div className="flex items-center gap-4">
                                 <Button
                                     onClick={savePermissions}
                                     disabled={saving}
@@ -264,10 +250,9 @@ export default function AccessMatrixPage() {
                                         </div>
                                     </div>
                                     <div className="ml-auto text-right hidden sm:block">
-                                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Target Outlet</p>
-                                        <p className="text-lg font-bold text-primary flex items-center justify-end gap-2">
-                                            <Store className="h-4 w-4" />
-                                            {selectedOutlet?.name}
+                                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Access Level</p>
+                                        <p className="text-lg font-bold text-primary flex items-center justify-end gap-2 text-right">
+                                            {selectedUser.role}
                                         </p>
                                     </div>
                                 </div>

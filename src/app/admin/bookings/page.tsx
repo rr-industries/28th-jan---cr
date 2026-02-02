@@ -2,13 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { 
-  Search, 
-  Calendar, 
-  Trash2, 
-  Users, 
-  Clock, 
-  CheckCircle2, 
+import {
+  Search,
+  Calendar,
+  Trash2,
+  Users,
+  Clock,
+  CheckCircle2,
   XCircle,
   RefreshCw,
   MoreVertical,
@@ -45,34 +45,34 @@ type Booking = {
 };
 
 export default function BookingsPage() {
-  const { selectedOutlet, hasPermission } = useAdmin();
+  const { selectedOutlet, user, hasPermission } = useAdmin();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState("all"); 
+  const [dateFilter, setDateFilter] = useState("all");
   const [selectedBookings, setSelectedBookings] = useState<string[]>([]);
 
-    useEffect(() => {
-      if (!selectedOutlet) return;
-      fetchBookings();
+  useEffect(() => {
+    if (!selectedOutlet) return;
+    fetchBookings();
 
-      // Real-time subscription
-      const bookingsSubscription = supabase
-        .channel('bookings-realtime')
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'table_bookings',
-          filter: `outlet_id=eq.${selectedOutlet.id}`
-        }, () => {
-          fetchBookings();
-        })
-        .subscribe();
+    // Real-time subscription
+    const bookingsSubscription = supabase
+      .channel('bookings-realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'table_bookings',
+        filter: user?.is_super_admin ? undefined : `outlet_id=eq.${selectedOutlet.id}`
+      }, () => {
+        fetchBookings();
+      })
+      .subscribe();
 
-      return () => {
-        supabase.removeChannel(bookingsSubscription);
-      };
-    }, [dateFilter, selectedOutlet]);
+    return () => {
+      supabase.removeChannel(bookingsSubscription);
+    };
+  }, [dateFilter, selectedOutlet]);
 
   const fetchBookings = async () => {
     if (!selectedOutlet) return;
@@ -80,8 +80,13 @@ export default function BookingsPage() {
     try {
       let query = supabase
         .from("table_bookings")
-        .select("*")
-        .eq("outlet_id", selectedOutlet.id)
+        .select("*");
+
+      if (!user?.is_super_admin) {
+        query = query.eq("outlet_id", selectedOutlet.id);
+      }
+
+      query = query
         .order("booking_date", { ascending: true })
         .order("booking_time", { ascending: true });
 
@@ -104,36 +109,36 @@ export default function BookingsPage() {
     }
   };
 
-    const updateStatus = async (id: string, status: "confirmed" | "cancelled") => {
-      if (!hasPermission("bookings.edit")) return toast.error("Permission denied");
-      try {
-        const booking = bookings.find(b => b.id === id);
-        const { error } = await supabase
-          .from("table_bookings")
-          .update({ status })
-          .eq("id", id);
-  
-        if (error) throw error;
+  const updateStatus = async (id: string, status: "confirmed" | "cancelled") => {
+    if (!hasPermission("bookings.edit")) return toast.error("Permission denied");
+    try {
+      const booking = bookings.find(b => b.id === id);
+      const { error } = await supabase
+        .from("table_bookings")
+        .update({ status })
+        .eq("id", id);
 
-        // Send notification to customer/staff
-        await createNotification({
-          title: status === 'confirmed' ? "Your Table is Confirmed ☕" : "Booking Cancelled",
-          message: status === 'confirmed' 
-            ? `Your booking for ${booking?.guest_count} guests on ${booking?.booking_date} at ${booking?.booking_time} is confirmed.`
-            : `Your booking for ${booking?.booking_date} at ${booking?.booking_time} has been cancelled.`,
-          type: status === 'confirmed' ? "success" : "error",
-          priority: "normal",
-          category: "customer",
-          reference_id: id,
-          reference_type: "booking"
-        });
+      if (error) throw error;
 
-        toast.success(`Booking ${status}`);
-        fetchBookings();
-      } catch (error) {
-        toast.error("Status update failed");
-      }
-    };
+      // Send notification to customer/staff
+      await createNotification({
+        title: status === 'confirmed' ? "Your Table is Confirmed ☕" : "Booking Cancelled",
+        message: status === 'confirmed'
+          ? `Your booking for ${booking?.guest_count} guests on ${booking?.booking_date} at ${booking?.booking_time} is confirmed.`
+          : `Your booking for ${booking?.booking_date} at ${booking?.booking_time} has been cancelled.`,
+        type: status === 'confirmed' ? "success" : "error",
+        priority: "normal",
+        category: "customer",
+        reference_id: id,
+        reference_type: "booking"
+      });
+
+      toast.success(`Booking ${status}`);
+      fetchBookings();
+    } catch (error) {
+      toast.error("Status update failed");
+    }
+  };
 
   const deleteBooking = async (id: string) => {
     if (!hasPermission("bookings.cancel")) return toast.error("Permission denied");
@@ -168,7 +173,7 @@ export default function BookingsPage() {
     }
   };
 
-  const filteredBookings = bookings.filter(b => 
+  const filteredBookings = bookings.filter(b =>
     b.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     b.phone_number.includes(searchTerm)
   );
@@ -190,7 +195,7 @@ export default function BookingsPage() {
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedBookings(prev => 
+    setSelectedBookings(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -252,8 +257,8 @@ export default function BookingsPage() {
                 onClick={() => setDateFilter(filter)}
                 className={cn(
                   "flex-1 md:flex-none px-6 py-2 rounded-xl text-sm font-bold transition-all capitalize",
-                  dateFilter === filter 
-                    ? "bg-white text-primary shadow-sm" 
+                  dateFilter === filter
+                    ? "bg-white text-primary shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -261,11 +266,11 @@ export default function BookingsPage() {
               </button>
             ))}
           </div>
-          
+
           <div className="relative w-full md:w-96">
             <Search className="absolute left-4 top-3 h-5 w-5 text-muted-foreground" />
-            <Input 
-              placeholder="Search by phone or name..." 
+            <Input
+              placeholder="Search by phone or name..."
               className="h-12 pl-12 rounded-2xl bg-muted/30 border-none focus:ring-primary"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -275,7 +280,7 @@ export default function BookingsPage() {
 
         <div className="flex items-center gap-3 border-t pt-4">
           <div className="flex items-center gap-2 cursor-pointer" onClick={toggleSelectAll}>
-            <Checkbox 
+            <Checkbox
               checked={selectedBookings.length === filteredBookings.length && filteredBookings.length > 0}
               onCheckedChange={toggleSelectAll}
               className="rounded-md"
@@ -310,7 +315,7 @@ export default function BookingsPage() {
               )}
             >
               <div className="absolute top-5 left-5 z-10">
-                <Checkbox 
+                <Checkbox
                   checked={selectedBookings.includes(booking.id)}
                   onCheckedChange={() => toggleSelect(booking.id)}
                   className="rounded-md h-5 w-5"
@@ -343,7 +348,7 @@ export default function BookingsPage() {
                     <p className="text-sm font-bold">{booking.booking_time}</p>
                   </div>
                 </div>
-                
+
                 <div className="bg-primary/5 p-4 rounded-2xl flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="bg-primary/10 p-2.5 rounded-xl">
@@ -360,12 +365,12 @@ export default function BookingsPage() {
                   <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Booked On</p>
                   <p className="text-[10px] font-medium">{new Date(booking.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}</p>
                 </div>
-                
+
                 <div className="flex gap-2">
                   {booking.status === 'pending' && hasPermission("bookings.edit") && (
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
+                    <Button
+                      size="icon"
+                      variant="ghost"
                       className="h-10 w-10 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-full border-2 border-transparent hover:border-green-200"
                       onClick={() => updateStatus(booking.id, 'confirmed')}
                     >
@@ -373,9 +378,9 @@ export default function BookingsPage() {
                     </Button>
                   )}
                   {hasPermission("bookings.cancel") && (
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
+                    <Button
+                      size="icon"
+                      variant="ghost"
                       className="h-10 w-10 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full border-2 border-transparent hover:border-red-200"
                       onClick={() => deleteBooking(booking.id)}
                     >

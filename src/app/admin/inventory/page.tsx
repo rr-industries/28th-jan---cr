@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
-import { 
-  Package, 
-  Plus, 
-  Search, 
-  AlertTriangle, 
-  ArrowUpRight, 
+import {
+  Package,
+  Plus,
+  Search,
+  AlertTriangle,
+  ArrowUpRight,
   History,
   Trash2,
   Edit3,
@@ -43,12 +43,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useAdmin } from "@/context/AdminContext";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -92,7 +92,7 @@ const UNIT_MAP: Record<string, { category: string; unit: string; decimals: boole
 };
 
 export default function InventoryPage() {
-  const { selectedOutlet, hasPermission } = useAdmin();
+  const { selectedOutlet, user, hasPermission } = useAdmin();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,31 +136,45 @@ export default function InventoryPage() {
 
   const fetchInventory = async () => {
     if (!selectedOutlet) return;
-    
+
     // Fetch Inventory Master (Identity)
-    const { data: masterData, error: masterError } = await supabase
+    let queryMaster = supabase
       .from("inventory")
-      .select("*")
-      .eq("outlet_id", selectedOutlet.id)
-      .order("item_name");
-    
+      .select("*");
+
+    if (!user?.is_super_admin) {
+      queryMaster = queryMaster.eq("outlet_id", selectedOutlet.id);
+    }
+
+    const { data: masterData, error: masterError } = await queryMaster.order("item_name");
+
     if (masterError) return toast.error("Failed to load inventory master");
 
     // Fetch Current Stock (Calculated from movements via view)
-    const { data: stockData, error: stockError } = await supabase
+    let queryStock = supabase
       .from("live_stock")
-      .select("*")
-      .eq("outlet_id", selectedOutlet.id);
+      .select("*");
+
+    if (!user?.is_super_admin) {
+      queryStock = queryStock.eq("outlet_id", selectedOutlet.id);
+    }
+
+    const { data: stockData, error: stockError } = await queryStock;
 
     if (stockError) console.error("Stock fetch error:", stockError);
 
     // Fetch Today's Movements for metrics
     const today = new Date().toISOString().split('T')[0];
-    const { data: todayMoves, error: moveError } = await supabase
+    let queryTodayMoves = supabase
       .from("inventory_movements")
       .select("amount, type, reason, inventory_id")
-      .eq("outlet_id", selectedOutlet.id)
       .gte("created_at", `${today}T00:00:00Z`);
+
+    if (!user?.is_super_admin) {
+      queryTodayMoves = queryTodayMoves.eq("outlet_id", selectedOutlet.id);
+    }
+
+    const { data: todayMoves, error: moveError } = await queryTodayMoves;
 
     if (!moveError && todayMoves) {
       const consumption = todayMoves
@@ -175,7 +189,7 @@ export default function InventoryPage() {
     // Merge identity with calculated stock
     const mergedItems = (masterData || []).map(item => {
       const stock = stockData?.find(s => s.inventory_id === item.id);
-      
+
       // Calculate daily consumption per item from todayMoves
       const itemConsumption = todayMoves
         ?.filter(m => m.inventory_id === item.id && m.type === "Outgoing" && m.reason !== "Wastage")
@@ -197,13 +211,18 @@ export default function InventoryPage() {
 
   const fetchMovements = async () => {
     if (!selectedOutlet) return;
-    const { data, error } = await supabase
+    let queryMovements = supabase
       .from("inventory_movements")
-      .select("*, inventory(item_name, unit)")
-      .eq("outlet_id", selectedOutlet.id)
+      .select("*, inventory(item_name, unit)");
+
+    if (!user?.is_super_admin) {
+      queryMovements = queryMovements.eq("outlet_id", selectedOutlet.id);
+    }
+
+    const { data, error } = await queryMovements
       .order("created_at", { ascending: false })
       .limit(50);
-    
+
     if (error) console.error("Movements error:", error);
     else setMovements(data || []);
   };
@@ -272,7 +291,7 @@ export default function InventoryPage() {
           amount: movementFormData.amount,
           reason: movementFormData.reason
         });
-      
+
       if (moveError) throw moveError;
 
       // 2. We NO LONGER update the quantity column in inventory table
@@ -293,7 +312,7 @@ export default function InventoryPage() {
     setIsClosingDay(true);
     try {
       const today = new Date().toISOString().split('T')[0];
-      
+
       // 1. Create snapshots
       const snapshots = items.map(item => ({
         outlet_id: selectedOutlet.id,
@@ -314,7 +333,7 @@ export default function InventoryPage() {
       if (snapError) throw snapError;
 
       // 2. Set opening_stock for tomorrow in the master table
-      await Promise.all(items.map(item => 
+      await Promise.all(items.map(item =>
         supabase.from("inventory")
           .update({
             opening_stock: item.quantity
@@ -358,14 +377,14 @@ export default function InventoryPage() {
     document.body.removeChild(link);
   };
 
-  const filteredItems = items.filter(item => 
+  const filteredItems = items.filter(item =>
     item.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const lowStockItems = items.filter(item => Number(item.quantity) <= Number(item.low_stock_threshold));
-    const totalConsumption = todayMetrics.consumption;
-    const totalWastage = todayMetrics.wastage;
+  const totalConsumption = todayMetrics.consumption;
+  const totalWastage = todayMetrics.wastage;
 
   if (!hasPermission("inventory.view")) {
     return (
@@ -392,21 +411,21 @@ export default function InventoryPage() {
             <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
             Sync
           </Button>
-          <Button 
-            onClick={handleDailyClosing} 
+          <Button
+            onClick={handleDailyClosing}
             disabled={isClosingDay}
-            variant="outline" 
+            variant="outline"
             className="h-11 rounded-2xl border-2 border-primary/20 bg-primary/5 hover:bg-primary hover:text-white transition-all font-bold"
           >
             {isClosingDay ? <LoaderCircle className="h-4 w-4 animate-spin mr-2" /> : <Lock className="h-4 w-4 mr-2" />}
             Daily Closing
           </Button>
-          <Button 
-            onClick={() => { 
-              setEditingItem(null); 
-              setItemFormData({ item_name: "", category: "Dry Goods", unit: "kg", low_stock_threshold: 5, max_stock_level: 100, sku: "", status: "Active" }); 
-              setShowItemModal(true); 
-            }} 
+          <Button
+            onClick={() => {
+              setEditingItem(null);
+              setItemFormData({ item_name: "", category: "Dry Goods", unit: "kg", low_stock_threshold: 5, max_stock_level: 100, sku: "", status: "Active" });
+              setShowItemModal(true);
+            }}
             className="h-11 rounded-2xl font-bold shadow-lg shadow-primary/20"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -480,10 +499,10 @@ export default function InventoryPage() {
             <TabsTrigger value="movements" className="rounded-xl font-bold px-6 h-full data-[state=active]:bg-primary data-[state=active]:text-white">History</TabsTrigger>
           </TabsList>
           <div className="flex gap-2 w-full md:w-auto">
-             <div className="relative flex-1 md:w-64">
+            <div className="relative flex-1 md:w-64">
               <Search className="absolute left-4 top-3 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Filter items..." 
+              <Input
+                placeholder="Filter items..."
                 className="h-11 pl-10 rounded-2xl bg-white border-2"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -526,7 +545,7 @@ export default function InventoryPage() {
                         )}>{item.status}</Badge>
                       </td>
                       <td className="p-6 text-right">
-                        <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10" onClick={() => { setEditingItem(item); setItemFormData({...item}); setShowItemModal(true); }}>
+                        <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10" onClick={() => { setEditingItem(item); setItemFormData({ ...item }); setShowItemModal(true); }}>
                           <Edit3 className="h-4 w-4" />
                         </Button>
                       </td>
@@ -661,7 +680,7 @@ export default function InventoryPage() {
       </Tabs>
 
       <div className="flex justify-center pt-8">
-        <Button 
+        <Button
           onClick={() => { setSelectedItemForMovement(items[0]); setShowMovementModal(true); }}
           className="h-14 rounded-full px-10 font-black text-lg shadow-2xl shadow-primary/20 hover:scale-105 transition-transform"
         >
@@ -679,12 +698,12 @@ export default function InventoryPage() {
           <div className="space-y-6">
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest ml-1">Item Identity</label>
-              <Input value={itemFormData.item_name} onChange={e => setItemFormData({...itemFormData, item_name: e.target.value})} className="h-14 rounded-2xl text-lg font-bold border-2" />
+              <Input value={itemFormData.item_name} onChange={e => setItemFormData({ ...itemFormData, item_name: e.target.value })} className="h-14 rounded-2xl text-lg font-bold border-2" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest ml-1">Category</label>
-                <Select value={itemFormData.category} onValueChange={v => setItemFormData({...itemFormData, category: v})}>
+                <Select value={itemFormData.category} onValueChange={v => setItemFormData({ ...itemFormData, category: v })}>
                   <SelectTrigger className="h-14 rounded-2xl font-bold border-2"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {["Dry Goods", "Liquids", "Countables", "Dairy", "Consumables"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -693,15 +712,15 @@ export default function InventoryPage() {
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest ml-1">Unit</label>
-                <Input value={itemFormData.unit} onChange={e => setItemFormData({...itemFormData, unit: e.target.value})} className="h-14 rounded-2xl font-bold border-2" />
+                <Input value={itemFormData.unit} onChange={e => setItemFormData({ ...itemFormData, unit: e.target.value })} className="h-14 rounded-2xl font-bold border-2" />
               </div>
             </div>
           </div>
           <DialogFooter className="mt-8 gap-3">
-             <Button variant="outline" onClick={() => setShowItemModal(false)} className="h-14 rounded-2xl flex-1 font-bold">Cancel</Button>
-             <Button onClick={handleItemSubmit} disabled={submitting} className="h-14 rounded-2xl flex-[2] font-bold">
-               {submitting ? <LoaderCircle className="h-5 w-5 animate-spin" /> : "Confirm Master Entry"}
-             </Button>
+            <Button variant="outline" onClick={() => setShowItemModal(false)} className="h-14 rounded-2xl flex-1 font-bold">Cancel</Button>
+            <Button onClick={handleItemSubmit} disabled={submitting} className="h-14 rounded-2xl flex-[2] font-bold">
+              {submitting ? <LoaderCircle className="h-5 w-5 animate-spin" /> : "Confirm Master Entry"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -716,7 +735,7 @@ export default function InventoryPage() {
           <div className="space-y-6">
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest ml-1">Movement Type</label>
-              <Select value={movementFormData.type} onValueChange={(v: any) => setMovementFormData({...movementFormData, type: v})}>
+              <Select value={movementFormData.type} onValueChange={(v: any) => setMovementFormData({ ...movementFormData, type: v })}>
                 <SelectTrigger className="h-14 rounded-2xl font-bold border-2"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Incoming">➕ Incoming (Purchase)</SelectItem>
@@ -726,11 +745,11 @@ export default function InventoryPage() {
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest ml-1">Quantity ({selectedItemForMovement?.unit})</label>
-              <Input type="number" value={movementFormData.amount} onChange={e => setMovementFormData({...movementFormData, amount: Number(e.target.value)})} className="h-14 rounded-2xl text-2xl font-serif font-black border-2" />
+              <Input type="number" value={movementFormData.amount} onChange={e => setMovementFormData({ ...movementFormData, amount: Number(e.target.value) })} className="h-14 rounded-2xl text-2xl font-serif font-black border-2" />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest ml-1">Reason</label>
-              <Select value={movementFormData.reason} onValueChange={v => setMovementFormData({...movementFormData, reason: v})}>
+              <Select value={movementFormData.reason} onValueChange={v => setMovementFormData({ ...movementFormData, reason: v })}>
                 <SelectTrigger className="h-14 rounded-2xl font-bold border-2"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Purchase">Purchase</SelectItem>
@@ -743,10 +762,10 @@ export default function InventoryPage() {
             </div>
           </div>
           <DialogFooter className="mt-8 gap-3">
-             <Button variant="outline" onClick={() => setShowMovementModal(false)} className="h-14 rounded-2xl flex-1 font-bold">Cancel</Button>
-             <Button onClick={handleMovementSubmit} disabled={submitting} className="h-14 rounded-2xl flex-[2] font-bold">
-               {submitting ? <LoaderCircle className="h-5 w-5 animate-spin" /> : "Execute Movement"}
-             </Button>
+            <Button variant="outline" onClick={() => setShowMovementModal(false)} className="h-14 rounded-2xl flex-1 font-bold">Cancel</Button>
+            <Button onClick={handleMovementSubmit} disabled={submitting} className="h-14 rounded-2xl flex-[2] font-bold">
+              {submitting ? <LoaderCircle className="h-5 w-5 animate-spin" /> : "Execute Movement"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

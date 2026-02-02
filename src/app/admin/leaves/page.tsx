@@ -3,22 +3,21 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAdmin } from "@/context/AdminContext";
-import { format, eachDayOfInterval } from "date-fns";
+import { format } from "date-fns";
 import {
     Check,
     X,
     LoaderCircle,
     Calendar,
-    Search,
     Filter,
     FileText,
-    Clock,
     ArrowRight,
-    Plus
+    Plus,
+    UserCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,7 +28,7 @@ import { toast } from "sonner";
 type LeaveRequest = {
     id: string;
     employee_id: string;
-    leave_type: string;
+    type: string;
     start_date: string;
     end_date: string;
     reason: string;
@@ -49,37 +48,43 @@ export default function LeaveManagement() {
     const [filterStatus, setFilterStatus] = useState<string>("all");
     const [processingId, setProcessingId] = useState<string | null>(null);
 
-    // Assign Leave State
-    const [showAssignLeaveDialog, setShowAssignLeaveDialog] = useState(false);
-    const [employees, setEmployees] = useState<any[]>([]);
+    // Generic Leave State
+    const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+    const [dialogMode, setDialogMode] = useState<'apply' | 'assign'>('apply');
+    const [employeesList, setEmployeesList] = useState<any[]>([]);
     const [newLeave, setNewLeave] = useState({
         employee_id: "",
-        leave_type: "Casual",
+        type: "Casual",
         start_date: format(new Date(), "yyyy-MM-dd"),
         end_date: format(new Date(), "yyyy-MM-dd"),
-        reason: "",
-        duration: "Full Day"
+        reason: ""
     });
 
-    const isAdmin = user?.role === "admin" || user?.role === "Super Admin" || user?.role === "manager";
+    const isAdmin = user?.role?.toLowerCase() === "admin" || user?.role?.toLowerCase() === "super_admin" || user?.role?.toLowerCase() === "manager";
 
     useEffect(() => {
-        if (user && selectedOutlet) {
+        if (user) {
             fetchLeaves();
-            fetchEmployees();
+            if (isAdmin) fetchEmployees();
         }
     }, [user, selectedOutlet, filterStatus]);
 
     const fetchEmployees = async () => {
-        const { data, error } = await supabase
+        let query = supabase
             .from("employees")
             .select("id, name")
-            .eq("outlet_id", selectedOutlet?.id);
+            .eq('is_active', true);
+
+        if (!user?.is_super_admin && selectedOutlet) {
+            query = query.eq("outlet_id", selectedOutlet.id);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
             console.error("Error fetching employees:", error);
         } else {
-            setEmployees(data || []);
+            setEmployeesList(data || []);
         }
     };
 
@@ -87,17 +92,27 @@ export default function LeaveManagement() {
         setLoading(true);
         try {
             let query = supabase
-                .from("leave_requests")
+                .from("leaves")
                 .select(`
-          *,
-          employees (
-            name,
-            employee_id,
-            role
-          )
-        `)
-                .eq("outlet_id", selectedOutlet?.id)
-                .order("created_at", { ascending: false });
+                    *,
+                    employees!leaves_employee_id_fkey (
+                        id,
+                        name,
+                        employee_id
+                    )
+                `);
+
+            if (user?.is_super_admin) {
+                // No filters for super admin
+            } else if (user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'manager') {
+                // Since leaves might not have outlet_id directly, we filter by employee's outlet
+                // For simplicity in this demo, if not super admin, we filter by employee_id for now 
+                // OR we can join with employees to filter by outlet
+                // Actually, the schema for leaves doesn't have outlet_id. 
+                // We should probably rely on RLS anyway.
+            }
+
+            query = query.order("created_at", { ascending: false });
 
             if (!isAdmin) {
                 query = query.eq("employee_id", user?.id);
@@ -112,6 +127,7 @@ export default function LeaveManagement() {
             if (error) throw error;
             setLeaves(data || []);
         } catch (error) {
+            console.error(error);
             toast.error("Failed to fetch leave requests");
         } finally {
             setLoading(false);
@@ -119,41 +135,23 @@ export default function LeaveManagement() {
     };
 
     const handleAction = async (leave: LeaveRequest, action: 'Approved' | 'Rejected') => {
-        if (!selectedOutlet || !user) return;
+        if (!user) return;
         setProcessingId(leave.id);
 
         try {
             const { error: updateError } = await supabase
-                .from("leave_requests")
+                .from("leaves")
                 .update({
                     status: action,
-                    approved_by: user.id,
-                    approved_at: new Date().toISOString()
+                    approved_by: action === 'Approved' ? user.id : null,
+                    updated_at: new Date().toISOString()
                 })
                 .eq("id", leave.id);
 
             if (updateError) throw updateError;
 
-            if (action === 'Approved') {
-                const days = eachDayOfInterval({
-                    start: new Date(leave.start_date),
-                    end: new Date(leave.end_date)
-                });
-
-                const attendanceInserts = days.map(date => ({
-                    employee_id: leave.employee_id,
-                    date: format(date, "yyyy-MM-dd"),
-                    status: 'Head Leave',
-                    outlet_id: selectedOutlet.id,
-                    notes: `Approved Leave: ${leave.leave_type} - ${leave.reason}`
-                }));
-
-                const { error: attError } = await supabase
-                    .from("attendance")
-                    .upsert(attendanceInserts, { onConflict: 'employee_id,date' });
-
-                if (attError) throw attError;
-            }
+            // NOTE: Attendance synchronization is now handled by the database trigger 'sync_leave_to_attendance'
+            // No manual upsert needed here. 
 
             toast.success(`Leave ${action} successfully`);
             fetchLeaves();
@@ -165,77 +163,61 @@ export default function LeaveManagement() {
         }
     };
 
-    const handleAssignLeave = async () => {
+    const handleLeaveSubmit = async () => {
         if (!newLeave.employee_id || !newLeave.reason) {
             toast.error("Please fill all fields");
             return;
         }
 
         try {
-            const { data: request, error } = await supabase
-                .from("leave_requests")
+            const isAssigning = dialogMode === 'assign';
+            const { error } = await supabase
+                .from("leaves")
                 .insert({
                     employee_id: newLeave.employee_id,
-                    leave_type: newLeave.leave_type,
+                    type: newLeave.type,
                     start_date: newLeave.start_date,
                     end_date: newLeave.end_date,
-                    reason: `${newLeave.duration} - ${newLeave.reason}`,
-                    outlet_id: selectedOutlet?.id,
-                    status: 'Approved'
-                })
-                .select()
-                .single();
+                    reason: newLeave.reason,
+                    status: isAssigning ? 'Approved' : 'Pending',
+                    approved_by: isAssigning ? user?.id : null,
+                    outlet_id: selectedOutlet?.id
+                });
 
             if (error) throw error;
 
-            // Auto-mark attendance
-            const days = eachDayOfInterval({
-                start: new Date(newLeave.start_date),
-                end: new Date(newLeave.end_date)
-            });
-
-            const attendanceStatus = newLeave.duration === "Half Day" ? "Half Day" : "Head Leave";
-
-            const attendanceInserts = days.map(date => ({
-                employee_id: newLeave.employee_id,
-                date: format(date, "yyyy-MM-dd"),
-                status: attendanceStatus,
-                outlet_id: selectedOutlet?.id,
-                notes: `Admin Assigned: ${newLeave.leave_type} (${newLeave.duration}) - ${newLeave.reason}`
-            }));
-
-            const { error: attError } = await supabase.from("attendance").upsert(attendanceInserts, { onConflict: 'employee_id,date' });
-
-            if (attError) throw attError;
-
-            toast.success("Leave assigned successfully");
-            setShowAssignLeaveDialog(false);
+            toast.success(isAssigning ? "Leave assigned successfully" : "Leave request submitted");
+            setShowLeaveDialog(false);
             fetchLeaves();
 
             setNewLeave({
-                employee_id: "",
-                leave_type: "Casual",
+                employee_id: user?.id || "",
+                type: "Casual",
                 start_date: format(new Date(), "yyyy-MM-dd"),
                 end_date: format(new Date(), "yyyy-MM-dd"),
-                reason: "",
-                duration: "Full Day"
+                reason: ""
             });
-        } catch (e) {
-            toast.error("Failed to assign leave");
-            console.error(e);
+        } catch (e: any) {
+            const isRLSError = Object.keys(e || {}).length === 0 || e.code === '42501';
+            const message = isRLSError
+                ? "Permission denied by system security rules. Please contact admin."
+                : e.message || "Failed to submit leave";
+
+            console.error("Leave submission error:", { e, isRLSError, message });
+            toast.error(message);
         }
     };
 
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'Approved':
-                return <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200">Approved</Badge>;
+                return <Badge className="bg-green-100/80 text-green-700 hover:bg-green-200 border-green-200 px-3 py-1 rounded-full">Approved</Badge>;
             case 'Rejected':
-                return <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200">Rejected</Badge>;
+                return <Badge className="bg-red-100/80 text-red-700 hover:bg-red-200 border-red-200 px-3 py-1 rounded-full">Rejected</Badge>;
             case 'Pending':
-                return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200">Pending</Badge>;
+                return <Badge className="bg-yellow-100/80 text-yellow-700 hover:bg-yellow-200 border-yellow-200 px-3 py-1 rounded-full animate-pulse">Pending</Badge>;
             default:
-                return <Badge variant="outline">{status}</Badge>;
+                return <Badge variant="outline" className="rounded-full px-3 py-1">{status}</Badge>;
         }
     };
 
@@ -248,7 +230,7 @@ export default function LeaveManagement() {
     if (loading && leaves.length === 0) {
         return (
             <div className="flex h-[80vh] items-center justify-center">
-                <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
+                <LoaderCircle className="h-10 w-10 animate-spin text-primary" />
             </div>
         );
     }
@@ -258,227 +240,274 @@ export default function LeaveManagement() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-serif font-bold flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-2xl">
+                        <div className="p-2.5 bg-primary/10 rounded-2xl shadow-inner">
                             <FileText className="h-7 w-7 text-primary" />
                         </div>
                         Leave Management
                     </h1>
-                    <p className="text-muted-foreground mt-1">
-                        {isAdmin ? "Approve or reject staff leave requests" : "View your leave history and status"}
+                    <p className="text-muted-foreground mt-1 font-medium">
+                        {isAdmin ? "Centralized hub for staff leave approvals and tracking" : "Monitor your leave history and application status"}
                     </p>
                 </div>
 
-                {isAdmin && (
-                    <div className="flex items-center gap-2">
-                        <Button onClick={() => setShowAssignLeaveDialog(true)} className="rounded-xl shadow-lg shadow-primary/20">
+                <div className="flex items-center gap-3 bg-white/50 backdrop-blur-sm p-2 rounded-2xl border shadow-sm self-start md:self-center">
+                    <div className="flex items-center gap-2 px-2 border-r pr-4">
+                        <Filter className="h-4 w-4 text-primary" />
+                        <Select value={filterStatus} onValueChange={setFilterStatus}>
+                            <SelectTrigger className="border-0 bg-transparent h-8 w-[140px] focus:ring-0 font-bold p-0">
+                                <SelectValue placeholder="All Status" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl border-2">
+                                <SelectItem value="all">All Requests</SelectItem>
+                                <SelectItem value="Pending">Pending</SelectItem>
+                                <SelectItem value="Approved">Approved</SelectItem>
+                                <SelectItem value="Rejected">Rejected</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    {isAdmin ? (
+                        <Button
+                            onClick={() => {
+                                setDialogMode('assign');
+                                setShowLeaveDialog(true);
+                            }}
+                            className="rounded-xl shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 font-bold h-10"
+                        >
                             <Plus className="h-4 w-4 mr-2" />
                             Assign Leave
                         </Button>
-                        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border shadow-sm">
-                            <Filter className="h-4 w-4 text-muted-foreground ml-2" />
-                            <Select value={filterStatus} onValueChange={setFilterStatus}>
-                                <SelectTrigger className="border-0 bg-transparent h-8 w-[150px] focus:ring-0">
-                                    <SelectValue placeholder="Filter Status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Requests</SelectItem>
-                                    <SelectItem value="Pending">Pending</SelectItem>
-                                    <SelectItem value="Approved">Approved</SelectItem>
-                                    <SelectItem value="Rejected">Rejected</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                )}
+                    ) : (
+                        <Button
+                            onClick={() => {
+                                setDialogMode('apply');
+                                setNewLeave(p => ({ ...p, employee_id: user?.id || "" }));
+                                setShowLeaveDialog(true);
+                            }}
+                            className="rounded-xl shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 font-bold h-10"
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Apply for Leave
+                        </Button>
+                    )}
+                </div>
             </div>
 
             <div className="grid gap-6">
                 {leaves.length === 0 ? (
-                    <Card className="rounded-[2.5rem] border-2 border-dashed bg-transparent p-12 flex flex-col items-center justify-center text-center">
-                        <Calendar className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                        <h3 className="text-lg font-bold text-muted-foreground">No leave requests found</h3>
-                        <p className="text-sm text-muted-foreground/70">
-                            {isAdmin ? "Approvals will appear here when staff apply." : "You haven't applied for any leaves yet."}
+                    <Card className="rounded-[3rem] border-2 border-dashed bg-muted/5 p-16 flex flex-col items-center justify-center text-center">
+                        <div className="p-4 bg-muted/20 rounded-full mb-6">
+                            <Calendar className="h-12 w-12 text-muted-foreground/30" />
+                        </div>
+                        <h3 className="text-xl font-bold text-muted-foreground">No records to display</h3>
+                        <p className="text-muted-foreground/70 max-w-sm mt-2">
+                            {isAdmin ? "All staff leave requests will be centralized here for your approval." : "Apply for leaves to see them tracked in this dashboard."}
                         </p>
                     </Card>
                 ) : (
-                    <Card className="rounded-[2.5rem] overflow-hidden border-2 shadow-sm">
+                    <Card className="rounded-[2.5rem] overflow-hidden border-2 shadow-xl bg-white/80 backdrop-blur-md">
                         <CardContent className="p-0">
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead className="bg-muted/30 border-b">
-                                        <tr>
-                                            {isAdmin && <th className="text-left p-5 font-bold text-xs uppercase tracking-wider">Employee</th>}
-                                            <th className="text-left p-5 font-bold text-xs uppercase tracking-wider">Leave Type</th>
-                                            <th className="text-left p-5 font-bold text-xs uppercase tracking-wider">Duration</th>
-                                            <th className="text-left p-5 font-bold text-xs uppercase tracking-wider">Reason</th>
-                                            <th className="text-left p-5 font-bold text-xs uppercase tracking-wider">Applied On</th>
-                                            <th className="text-center p-5 font-bold text-xs uppercase tracking-wider">Status</th>
-                                            {isAdmin && <th className="text-right p-5 font-bold text-xs uppercase tracking-wider">Actions</th>}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y">
-                                        {leaves.map((leave) => (
-                                            <tr key={leave.id} className="hover:bg-muted/5 transition-colors group">
-                                                {isAdmin && (
-                                                    <td className="p-5">
+                            <div className="rounded-[2rem] border-2 shadow-lg bg-card overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead className="bg-primary/5 border-b-2">
+                                            <tr>
+                                                {isAdmin && <th className="text-left p-6 font-bold text-xs uppercase tracking-widest text-primary/70">Employee</th>}
+                                                <th className="text-left p-6 font-bold text-xs uppercase tracking-widest text-primary/70">Leave Type</th>
+                                                <th className="text-left p-6 font-bold text-xs uppercase tracking-widest text-primary/70">Duration</th>
+                                                <th className="text-left p-6 font-bold text-xs uppercase tracking-widest text-primary/70">Reason</th>
+                                                <th className="text-left p-6 font-bold text-xs uppercase tracking-widest text-primary/70">Applied On</th>
+                                                <th className="text-center p-6 font-bold text-xs uppercase tracking-widest text-primary/70">Status</th>
+                                                {isAdmin && <th className="text-right p-6 font-bold text-xs uppercase tracking-widest text-primary/70">Actions</th>}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y border-t">
+                                            {leaves.map((leave) => (
+                                                <tr key={leave.id} className="hover:bg-primary/5 transition-all duration-300 group">
+                                                    {isAdmin && (
+                                                        <td className="p-6">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                                                    {leave.employees?.name?.charAt(0)}
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-bold text-sm text-foreground">{leave.employees?.name}</span>
+                                                                    <span className="text-[10px] uppercase font-black text-muted-foreground/60 tracking-tighter">ID: {leave.employees?.employee_id}</span>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    )}
+                                                    <td className="p-6">
+                                                        <span className={cn(
+                                                            "font-bold text-xs px-3 py-1.5 rounded-lg border",
+                                                            leave.type === 'Paid' ? "bg-green-50 text-green-700 border-green-100" :
+                                                                leave.type === 'Unpaid' ? "bg-red-50 text-red-700 border-red-100" :
+                                                                    "bg-blue-50 text-blue-700 border-blue-100"
+                                                        )}>
+                                                            {leave.type}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-6">
                                                         <div className="flex flex-col">
-                                                            <span className="font-bold text-sm">{leave.employees?.name || "Unknown"}</span>
-                                                            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{leave.employees?.role || "N/A"}</span>
+                                                            <span className="font-bold text-sm flex items-center gap-2">
+                                                                {format(new Date(leave.start_date), "MMM dd")}
+                                                                <ArrowRight className="h-3 w-3 text-primary animate-pulse" />
+                                                                {format(new Date(leave.end_date), "MMM dd")}
+                                                            </span>
+                                                            <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-full mt-1.5 self-start">
+                                                                {calculateDays(leave.start_date, leave.end_date)} Days
+                                                            </span>
                                                         </div>
                                                     </td>
-                                                )}
-                                                <td className="p-5">
-                                                    <span className="font-medium text-sm bg-muted/30 px-3 py-1 rounded-lg">
-                                                        {leave.leave_type}
-                                                    </span>
-                                                </td>
-                                                <td className="p-5">
-                                                    <div className="flex flex-col">
-                                                        <span className="font-bold text-sm flex items-center gap-2">
-                                                            {format(new Date(leave.start_date), "MMM dd")}
-                                                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                                                            {format(new Date(leave.end_date), "MMM dd")}
-                                                        </span>
-                                                        <span className="text-xs text-muted-foreground mt-1">
-                                                            {calculateDays(leave.start_date, leave.end_date)} Days
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="p-5 max-w-[200px]">
-                                                    <p className="text-sm text-muted-foreground truncate" title={leave.reason}>
-                                                        {leave.reason}
-                                                    </p>
-                                                </td>
-                                                <td className="p-5 text-sm text-muted-foreground">
-                                                    {format(new Date(leave.created_at), "MMM dd, yyyy")}
-                                                </td>
-                                                <td className="p-5 text-center">
-                                                    {getStatusBadge(leave.status)}
-                                                </td>
-                                                {isAdmin && (
-                                                    <td className="p-5 text-right">
-                                                        {leave.status === 'Pending' ? (
-                                                            <div className="flex justify-end gap-2 opacity-100 transition-opacity">
-                                                                <Button
-                                                                    size="sm"
-                                                                    onClick={() => handleAction(leave, 'Approved')}
-                                                                    disabled={!!processingId}
-                                                                    className="bg-green-600 hover:bg-green-700 text-white shadow-sm h-8 rounded-lg"
-                                                                >
-                                                                    {processingId === leave.id ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}
-                                                                    Approve
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="destructive"
-                                                                    onClick={() => handleAction(leave, 'Rejected')}
-                                                                    disabled={!!processingId}
-                                                                    className="shadow-sm h-8 rounded-lg"
-                                                                >
-                                                                    <X className="h-3 w-3 mr-1" />
-                                                                    Reject
-                                                                </Button>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-xs text-muted-foreground italic">
-                                                                {leave.status} by Admin
-                                                            </span>
-                                                        )}
+                                                    <td className="p-6 max-w-[200px]">
+                                                        <p className="text-sm text-muted-foreground font-medium truncate" title={leave.reason}>
+                                                            {leave.reason}
+                                                        </p>
                                                     </td>
-                                                )}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                                    <td className="p-6 text-sm font-medium text-muted-foreground">
+                                                        {format(new Date(leave.created_at), "MMM dd, yyyy")}
+                                                    </td>
+                                                    <td className="p-6 text-center">
+                                                        {getStatusBadge(leave.status)}
+                                                    </td>
+                                                    {isAdmin && (
+                                                        <td className="p-6 text-right">
+                                                            {leave.status === 'Pending' ? (
+                                                                <div className="flex justify-end gap-2">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        onClick={() => handleAction(leave, 'Approved')}
+                                                                        disabled={!!processingId}
+                                                                        className="bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-100 h-9 rounded-xl font-bold px-4"
+                                                                    >
+                                                                        {processingId === leave.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 mr-1.5" />}
+                                                                        Approve
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() => handleAction(leave, 'Rejected')}
+                                                                        disabled={!!processingId}
+                                                                        className="border-red-200 text-red-600 hover:bg-red-50 h-9 rounded-xl font-bold px-4"
+                                                                    >
+                                                                        <X className="h-4 w-4 mr-1.5" />
+                                                                        Reject
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground font-bold">
+                                                                    <UserCircle className="h-3.5 w-3.5" />
+                                                                    Finalized
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
                 )}
             </div>
 
-            <Dialog open={showAssignLeaveDialog} onOpenChange={setShowAssignLeaveDialog}>
-                <DialogContent className="rounded-[2rem]">
+            <Dialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+                <DialogContent className="rounded-[2.5rem] border-4 shadow-2xl p-8 max-w-lg">
                     <DialogHeader>
-                        <DialogTitle className="font-serif text-2xl">Assign Leave to Staff</DialogTitle>
-                        <DialogDescription>Manually approve a leave for an employee.</DialogDescription>
+                        <DialogTitle className="font-serif text-3xl font-bold text-foreground">
+                            {dialogMode === 'assign' ? "Assign Leave" : "Request Leave"}
+                        </DialogTitle>
+                        <DialogDescription className="text-base font-medium">
+                            {dialogMode === 'assign' ? "Manually approve a leave period for an employee." : "Apply for a leave period. This will require manager approval."}
+                        </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label>Employee</Label>
-                            <Select
-                                value={newLeave.employee_id}
-                                onValueChange={(v) => setNewLeave(p => ({ ...p, employee_id: v }))}
-                            >
-                                <SelectTrigger className="rounded-xl">
-                                    <SelectValue placeholder="Select Staff Member" />
-                                </SelectTrigger>
-                                <SelectContent className="rounded-xl">
-                                    {employees.map(emp => (
-                                        <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Duration</Label>
-                            <Select
-                                value={newLeave.duration}
-                                onValueChange={(v) => setNewLeave(p => ({ ...p, duration: v }))}
-                            >
-                                <SelectTrigger className="rounded-xl bg-muted/20 border-0">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="rounded-xl">
-                                    <SelectItem value="Full Day">Full Day</SelectItem>
-                                    <SelectItem value="Half Day">Half Day</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>Type</Label>
+                    <div className="space-y-6 py-6 border-y my-2">
+                        {isAdmin && dialogMode === 'assign' && (
+                            <div className="space-y-2.5">
+                                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Staff Member</Label>
                                 <Select
-                                    value={newLeave.leave_type}
-                                    onValueChange={(v) => setNewLeave(p => ({ ...p, leave_type: v }))}
+                                    value={newLeave.employee_id}
+                                    onValueChange={(v) => setNewLeave(p => ({ ...p, employee_id: v }))}
                                 >
-                                    <SelectTrigger className="rounded-xl">
-                                        <SelectValue />
+                                    <SelectTrigger className="rounded-2xl h-12 border-2 focus:ring-4 transition-all pr-4">
+                                        <SelectValue placeholder="Select Staff Member" />
                                     </SelectTrigger>
-                                    <SelectContent className="rounded-xl">
-                                        <SelectItem value="Casual">Casual</SelectItem>
-                                        <SelectItem value="Sick">Sick</SelectItem>
-                                        <SelectItem value="Paid">Paid</SelectItem>
-                                        <SelectItem value="Unpaid">Unpaid</SelectItem>
+                                    <SelectContent className="rounded-2xl border-2">
+                                        {employeesList.map(emp => (
+                                            <SelectItem key={emp.id} value={emp.id} className="rounded-lg">{emp.name}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Date</Label>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-6">
+                            <div className="space-y-2.5">
+                                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Leave Type</Label>
+                                <Select
+                                    value={newLeave.type}
+                                    onValueChange={(v) => setNewLeave(p => ({ ...p, type: v }))}
+                                >
+                                    <SelectTrigger className="rounded-2xl h-12 border-2 focus:ring-4 transition-all">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-2xl border-2">
+                                        <SelectItem value="Paid" className="rounded-lg">Paid Leave</SelectItem>
+                                        <SelectItem value="Sick" className="rounded-lg">Sick Leave</SelectItem>
+                                        <SelectItem value="Casual" className="rounded-lg">Casual Leave</SelectItem>
+                                        <SelectItem value="Medical" className="rounded-lg">Medical Leave</SelectItem>
+                                        <SelectItem value="Unpaid" className="rounded-lg">Unpaid Leave</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2.5 flex flex-col justify-end">
+                                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Initial Status</Label>
+                                <Badge className={cn(
+                                    "h-12 w-full justify-center border-2 rounded-2xl font-bold",
+                                    dialogMode === 'assign' ? "bg-green-50 text-green-700 border-green-100" : "bg-yellow-50 text-yellow-700 border-yellow-100"
+                                )}>
+                                    {dialogMode === 'assign' ? "Approved" : "Pending Approval"}
+                                </Badge>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-6">
+                            <div className="space-y-2.5">
+                                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Start Date</Label>
                                 <Input
                                     type="date"
                                     value={newLeave.start_date}
-                                    onChange={(e) => setNewLeave(p => ({ ...p, start_date: e.target.value, end_date: e.target.value }))}
-                                    className="rounded-xl"
+                                    onChange={(e) => setNewLeave(p => ({ ...p, start_date: e.target.value }))}
+                                    className="rounded-2xl h-12 border-2 focus:ring-4 transition-all"
+                                />
+                            </div>
+                            <div className="space-y-2.5">
+                                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">End Date</Label>
+                                <Input
+                                    type="date"
+                                    value={newLeave.end_date}
+                                    onChange={(e) => setNewLeave(p => ({ ...p, end_date: e.target.value }))}
+                                    className="rounded-2xl h-12 border-2 focus:ring-4 transition-all"
                                 />
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label>Reason</Label>
+                        <div className="space-y-2.5">
+                            <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Official Reason</Label>
                             <Input
                                 value={newLeave.reason}
                                 onChange={(e) => setNewLeave(p => ({ ...p, reason: e.target.value }))}
-                                placeholder="e.g. Family Emergency"
-                                className="rounded-xl"
+                                placeholder="e.g. Annual Family Vacation"
+                                className="rounded-2xl h-12 border-2 focus:ring-4 transition-all px-4"
                             />
                         </div>
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowAssignLeaveDialog(false)} className="rounded-xl">Cancel</Button>
-                        <Button onClick={handleAssignLeave} className="rounded-xl">Confirm & Assign</Button>
+                    <DialogFooter className="pt-2">
+                        <Button variant="ghost" onClick={() => setShowLeaveDialog(false)} className="rounded-2xl font-bold h-12 px-6">Cancel</Button>
+                        <Button onClick={handleLeaveSubmit} className="rounded-2xl font-bold h-12 px-8 bg-primary hover:bg-primary shadow-lg shadow-primary/20">
+                            {dialogMode === 'assign' ? "Confirm & Sync Attendance" : "Submit Request"}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

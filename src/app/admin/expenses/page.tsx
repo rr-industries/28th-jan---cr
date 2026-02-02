@@ -3,14 +3,14 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAdmin } from "@/context/AdminContext";
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Wallet, 
-  Calendar, 
-  ArrowUpRight, 
-  TrendingUp, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Wallet,
+  Calendar,
+  ArrowUpRight,
+  TrendingUp,
   MoreHorizontal,
   Trash2,
   Edit3,
@@ -36,120 +36,124 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-  type Expense = {
-    id: string;
-    expense_date: string;
-    description: string;
-    category: string;
-    amount: number;
-    payment_method: string;
-    notes: string;
-    is_recurring: boolean;
-    frequency: string;
-    vendor_name: string;
-    invoice_number: string;
-    created_at: string;
+type Expense = {
+  id: string;
+  expense_date: string;
+  description: string;
+  category: string;
+  amount: number;
+  payment_method: string;
+  notes: string;
+  is_recurring: boolean;
+  frequency: string;
+  vendor_name: string;
+  invoice_number: string;
+  created_at: string;
+};
+
+const EXPENSE_CATEGORIES = [
+  "Operational",
+  "Staff",
+  "Inventory Purchase",
+  "Marketing",
+  "Maintenance",
+  "Financial",
+  "Others"
+];
+
+const PAYMENT_METHODS = ["Cash", "Bank Transfer", "UPI", "Credit Card"];
+
+export default function ExpensesPage() {
+  const { selectedOutlet, user, hasPermission } = useAdmin();
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [formData, setFormData] = useState({
+    description: "",
+    category: "Operational",
+    amount: "",
+    payment_method: "Cash",
+    expense_date: new Date().toISOString().split('T')[0],
+    notes: "",
+    is_recurring: false,
+    frequency: "monthly",
+    vendor_name: "",
+    invoice_number: ""
+  });
+
+  useEffect(() => {
+    if (!selectedOutlet) return;
+    fetchExpenses();
+  }, [selectedOutlet]);
+
+  const fetchExpenses = async () => {
+    setLoading(true);
+    let query = supabase
+      .from("expenses")
+      .select("*");
+
+    if (!user?.is_super_admin) {
+      query = query.eq("outlet_id", selectedOutlet?.id);
+    }
+
+    const { data, error } = await query.order("expense_date", { ascending: false });
+
+    if (error) toast.error("Failed to load expenses");
+    else setExpenses(data || []);
+    setLoading(false);
   };
 
-  const EXPENSE_CATEGORIES = [
-    "Operational",
-    "Staff",
-    "Inventory Purchase",
-    "Marketing",
-    "Maintenance",
-    "Financial",
-    "Others"
-  ];
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.description || !formData.amount) {
+      toast.error("Description and amount are required");
+      return;
+    }
 
-  const PAYMENT_METHODS = ["Cash", "Bank Transfer", "UPI", "Credit Card"];
+    setSubmitting(true);
+    try {
+      const payload = {
+        ...formData,
+        amount: parseFloat(formData.amount),
+        outlet_id: selectedOutlet?.id,
+      };
 
-  export default function ExpensesPage() {
-    const { selectedOutlet, hasPermission } = useAdmin();
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState("all");
-    const [showAddModal, setShowAddModal] = useState(false);
-    const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-    const [submitting, setSubmitting] = useState(false);
-
-    const [formData, setFormData] = useState({
-      description: "",
-      category: "Operational",
-      amount: "",
-      payment_method: "Cash",
-      expense_date: new Date().toISOString().split('T')[0],
-      notes: "",
-      is_recurring: false,
-      frequency: "monthly",
-      vendor_name: "",
-      invoice_number: ""
-    });
-
-    useEffect(() => {
-      if (!selectedOutlet) return;
+      if (editingExpense) {
+        const { error } = await supabase
+          .from("expenses")
+          .update(payload)
+          .eq("id", editingExpense.id);
+        if (error) throw error;
+        toast.success("Expense updated");
+      } else {
+        const { error } = await supabase
+          .from("expenses")
+          .insert([payload]);
+        if (error) throw error;
+        toast.success("Expense recorded");
+      }
+      setShowAddModal(false);
       fetchExpenses();
-    }, [selectedOutlet]);
-
-    const fetchExpenses = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("expenses")
-        .select("*")
-        .eq("outlet_id", selectedOutlet?.id)
-        .order("expense_date", { ascending: false });
-      
-      if (error) toast.error("Failed to load expenses");
-      else setExpenses(data || []);
-      setLoading(false);
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!formData.description || !formData.amount) {
-        toast.error("Description and amount are required");
-        return;
-      }
-
-      setSubmitting(true);
-      try {
-        const payload = {
-          ...formData,
-          amount: parseFloat(formData.amount),
-          outlet_id: selectedOutlet?.id,
-        };
-
-        if (editingExpense) {
-          const { error } = await supabase
-            .from("expenses")
-            .update(payload)
-            .eq("id", editingExpense.id);
-          if (error) throw error;
-          toast.success("Expense updated");
-        } else {
-          const { error } = await supabase
-            .from("expenses")
-            .insert([payload]);
-          if (error) throw error;
-          toast.success("Expense recorded");
-        }
-        setShowAddModal(false);
-        fetchExpenses();
-      } catch (error) {
-        toast.error("Failed to save expense");
-      } finally {
-        setSubmitting(false);
-      }
-    };
+    } catch (error) {
+      toast.error("Failed to save expense");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
 
   const deleteExpense = async (id: string) => {
@@ -162,8 +166,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
   };
 
   const filteredExpenses = expenses.filter(exp => {
-    const matchesSearch = exp.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          exp.vendor_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = exp.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      exp.vendor_name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "all" || exp.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -184,93 +188,93 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
             Expense management for {selectedOutlet?.name}
           </p>
         </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="h-11 rounded-2xl">
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
-            <Button 
-                onClick={() => {
-                  setEditingExpense(null);
-                  setFormData({
-                    description: "",
-                    category: "Operational",
-                    amount: "",
-                    payment_method: "Cash",
-                    expense_date: new Date().toISOString().split('T')[0],
-                    notes: "",
-                    is_recurring: false,
-                    frequency: "monthly",
-                    vendor_name: "",
-                    invoice_number: ""
-                  });
-                  setShowAddModal(true);
-                }} 
+        <div className="flex gap-2">
+          <Button variant="outline" className="h-11 rounded-2xl">
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingExpense(null);
+              setFormData({
+                description: "",
+                category: "Operational",
+                amount: "",
+                payment_method: "Cash",
+                expense_date: new Date().toISOString().split('T')[0],
+                notes: "",
+                is_recurring: false,
+                frequency: "monthly",
+                vendor_name: "",
+                invoice_number: ""
+              });
+              setShowAddModal(true);
+            }}
 
-              className="h-11 rounded-2xl font-bold"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Expense
-            </Button>
+            className="h-11 rounded-2xl font-bold"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Expense
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card className="bg-white rounded-[2.5rem] border shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-6 opacity-5">
+            <TrendingUp className="h-20 w-20 text-primary" />
           </div>
-        </div>
-  
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="bg-white rounded-[2.5rem] border shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-6 opacity-5">
-              <TrendingUp className="h-20 w-20 text-primary" />
-            </div>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total Expenditure</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-serif font-bold text-primary">₹{totalAmount.toFixed(0)}</p>
-            </CardContent>
-          </Card>
-  
-          <Card className="bg-white rounded-[2.5rem] border shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-6 opacity-5 text-orange-500">
-              <Filter className="h-20 w-20" />
-            </div>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Top Category</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-orange-600 truncate">{topCategory?.name || "N/A"}</p>
-            </CardContent>
-          </Card>
-  
-          <Card className="bg-white rounded-[2.5rem] border shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-6 opacity-5 text-blue-500">
-              <Receipt className="h-20 w-20" />
-            </div>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Record Count</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-serif font-bold text-blue-600">{filteredExpenses.length}</p>
-            </CardContent>
-          </Card>
-  
-          <Card className="bg-primary text-secondary rounded-[2.5rem] border-none shadow-xl shadow-primary/10 overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-6 opacity-10">
-              <Calendar className="h-20 w-20" />
-            </div>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-widest opacity-70">Frequency</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-serif font-bold">Daily Logs</p>
-            </CardContent>
-          </Card>
-        </div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total Expenditure</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-4xl font-serif font-bold text-primary">₹{totalAmount.toFixed(0)}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white rounded-[2.5rem] border shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-6 opacity-5 text-orange-500">
+            <Filter className="h-20 w-20" />
+          </div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Top Category</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-orange-600 truncate">{topCategory?.name || "N/A"}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white rounded-[2.5rem] border shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-6 opacity-5 text-blue-500">
+            <Receipt className="h-20 w-20" />
+          </div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Record Count</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-4xl font-serif font-bold text-blue-600">{filteredExpenses.length}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-primary text-secondary rounded-[2.5rem] border-none shadow-xl shadow-primary/10 overflow-hidden relative">
+          <div className="absolute top-0 right-0 p-6 opacity-10">
+            <Calendar className="h-20 w-20" />
+          </div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest opacity-70">Frequency</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-serif font-bold">Daily Logs</p>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card className="bg-white rounded-[2.5rem] border shadow-xl overflow-hidden">
         <div className="p-6 border-b bg-muted/20 flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="relative w-full md:w-96">
             <Search className="absolute left-4 top-3 h-5 w-5 text-muted-foreground" />
-            <Input 
-              placeholder="Search expenses or vendors..." 
+            <Input
+              placeholder="Search expenses or vendors..."
               className="h-12 pl-12 rounded-2xl bg-white border-none shadow-sm focus:ring-primary font-medium"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -313,72 +317,72 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
                 ) : filteredExpenses.length === 0 ? (
                   <tr><td colSpan={5} className="p-20 text-center text-muted-foreground italic">No expenses recorded</td></tr>
                 ) : (
-                      filteredExpenses.map((exp) => (
-                      <tr key={exp.id} className="group hover:bg-muted/5 transition-colors">
-                          <td className="p-6">
-                            <p className="font-bold text-sm">{new Date(exp.expense_date).toLocaleDateString()}</p>
-                            <Badge variant="outline" className="mt-1 rounded-xl text-[10px] font-black uppercase tracking-widest px-2 py-0">
-                              {exp.category}
-                            </Badge>
-                          </td>
-                          <td className="p-6">
-                            <p className="font-bold text-gray-900">{exp.description}</p>
-                            {exp.is_recurring && (
-                              <span className="text-[10px] text-primary font-black uppercase tracking-tighter flex items-center gap-1 mt-1">
-                                <ArrowUpRight className="h-3 w-3" /> Recurring ({exp.frequency})
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-6 text-xs font-bold text-muted-foreground">
-                            {exp.vendor_name || "-"} <br />
-                            <span className="text-[10px] opacity-70">{exp.invoice_number || "#No Invoice"}</span>
-                          </td>
-                          <td className="p-6 text-right">
-                            <span className="text-xl font-serif font-black text-red-600">₹{Number(exp.amount).toFixed(0)}</span>
-                            <div className="flex items-center justify-end gap-1 mt-1">
-                              {exp.payment_method === "UPI" && <Smartphone className="h-3 w-3 text-primary" />}
-                              {exp.payment_method === "Cash" && <Banknote className="h-3 w-3 text-green-600" />}
-                              {exp.payment_method === "Bank Transfer" && <CreditCard className="h-3 w-3 text-blue-600" />}
-                              <span className="text-[9px] font-bold text-muted-foreground uppercase">{exp.payment_method}</span>
-                            </div>
-                          </td>
-                          <td className="p-6 text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-9 w-9 rounded-2xl hover:bg-muted"
-                                onClick={() => {
-                                  setEditingExpense(exp);
-                                  setFormData({
-                                    description: exp.description,
-                                    category: exp.category,
-                                    amount: exp.amount.toString(),
-                                    payment_method: exp.payment_method,
-                                    expense_date: exp.expense_date,
-                                    notes: exp.notes || "",
-                                    is_recurring: exp.is_recurring,
-                                    frequency: exp.frequency || "monthly",
-                                    vendor_name: exp.vendor_name || "",
-                                    invoice_number: exp.invoice_number || ""
-                                  });
-                                  setShowAddModal(true);
-                                }}
-                              >
-                                <Edit3 className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-9 w-9 rounded-2xl hover:bg-red-50"
-                                onClick={() => deleteExpense(exp.id)}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            </div>
-                          </td>
-                      </tr>
-                    ))
+                  filteredExpenses.map((exp) => (
+                    <tr key={exp.id} className="group hover:bg-muted/5 transition-colors">
+                      <td className="p-6">
+                        <p className="font-bold text-sm">{new Date(exp.expense_date).toLocaleDateString()}</p>
+                        <Badge variant="outline" className="mt-1 rounded-xl text-[10px] font-black uppercase tracking-widest px-2 py-0">
+                          {exp.category}
+                        </Badge>
+                      </td>
+                      <td className="p-6">
+                        <p className="font-bold text-gray-900">{exp.description}</p>
+                        {exp.is_recurring && (
+                          <span className="text-[10px] text-primary font-black uppercase tracking-tighter flex items-center gap-1 mt-1">
+                            <ArrowUpRight className="h-3 w-3" /> Recurring ({exp.frequency})
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-6 text-xs font-bold text-muted-foreground">
+                        {exp.vendor_name || "-"} <br />
+                        <span className="text-[10px] opacity-70">{exp.invoice_number || "#No Invoice"}</span>
+                      </td>
+                      <td className="p-6 text-right">
+                        <span className="text-xl font-serif font-black text-red-600">₹{Number(exp.amount).toFixed(0)}</span>
+                        <div className="flex items-center justify-end gap-1 mt-1">
+                          {exp.payment_method === "UPI" && <Smartphone className="h-3 w-3 text-primary" />}
+                          {exp.payment_method === "Cash" && <Banknote className="h-3 w-3 text-green-600" />}
+                          {exp.payment_method === "Bank Transfer" && <CreditCard className="h-3 w-3 text-blue-600" />}
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase">{exp.payment_method}</span>
+                        </div>
+                      </td>
+                      <td className="p-6 text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-2xl hover:bg-muted"
+                            onClick={() => {
+                              setEditingExpense(exp);
+                              setFormData({
+                                description: exp.description,
+                                category: exp.category,
+                                amount: exp.amount.toString(),
+                                payment_method: exp.payment_method,
+                                expense_date: exp.expense_date,
+                                notes: exp.notes || "",
+                                is_recurring: exp.is_recurring,
+                                frequency: exp.frequency || "monthly",
+                                vendor_name: exp.vendor_name || "",
+                                invoice_number: exp.invoice_number || ""
+                              });
+                              setShowAddModal(true);
+                            }}
+                          >
+                            <Edit3 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-2xl hover:bg-red-50"
+                            onClick={() => deleteExpense(exp.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
 
                 )}
               </tbody>
@@ -397,13 +401,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
               All financial records are immutable for audit safety.
             </DialogDescription>
           </DialogHeader>
-          
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest ml-1">Description</label>
-                <Input 
-                  value={formData.description} 
+                <Input
+                  value={formData.description}
                   onChange={e => setFormData({ ...formData, description: e.target.value })}
                   placeholder="e.g. Milk purchase 30L"
                   className="h-14 rounded-2xl font-bold border-2 focus:ring-primary"
@@ -411,9 +415,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase text-red-500 tracking-widest ml-1">Amount (₹)</label>
-                <Input 
+                <Input
                   type="number"
-                  value={formData.amount} 
+                  value={formData.amount}
                   onChange={e => setFormData({ ...formData, amount: e.target.value })}
                   placeholder="0.00"
                   className="h-14 rounded-2xl text-2xl font-serif font-black border-2 border-red-50 focus:border-red-500"
@@ -448,23 +452,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
                   </SelectContent>
                 </Select>
               </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest ml-1">Date</label>
-                  <Input 
-                    type="date"
-                    value={formData.expense_date} 
-                    onChange={e => setFormData({ ...formData, expense_date: e.target.value })}
-                    className="h-14 rounded-2xl font-bold border-2"
-                  />
-                </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest ml-1">Date</label>
+                <Input
+                  type="date"
+                  value={formData.expense_date}
+                  onChange={e => setFormData({ ...formData, expense_date: e.target.value })}
+                  className="h-14 rounded-2xl font-bold border-2"
+                />
+              </div>
 
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest ml-1">Vendor Name</label>
-                <Input 
-                  value={formData.vendor_name} 
+                <Input
+                  value={formData.vendor_name}
                   onChange={e => setFormData({ ...formData, vendor_name: e.target.value })}
                   placeholder="Supplier name"
                   className="h-14 rounded-2xl font-bold border-2"
@@ -472,8 +476,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest ml-1">Invoice Number</label>
-                <Input 
-                  value={formData.invoice_number} 
+                <Input
+                  value={formData.invoice_number}
                   onChange={e => setFormData({ ...formData, invoice_number: e.target.value })}
                   placeholder="#INV-0000"
                   className="h-14 rounded-2xl font-bold border-2"
@@ -483,8 +487,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest ml-1">Internal Notes</label>
-              <textarea 
-                value={formData.notes} 
+              <textarea
+                value={formData.notes}
                 onChange={e => setFormData({ ...formData, notes: e.target.value })}
                 className="w-full rounded-2xl border-2 p-4 text-sm font-medium focus:ring-1 focus:ring-primary min-h-[100px]"
                 placeholder="Add any extra context..."

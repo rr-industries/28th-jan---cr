@@ -30,7 +30,9 @@ import {
   FileText,
   User,
   Coffee,
-  Shield
+  Shield,
+  Clock,
+  DollarSign
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -40,6 +42,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import NotificationBell from "@/components/NotificationBell";
 import { AdminProvider, useAdmin } from "@/context/AdminContext";
 
@@ -62,6 +71,14 @@ const adminNavGroups = [
       { label: "Inventory", href: "/admin/inventory", icon: Package },
       { label: "Employees", href: "/admin/employees", icon: Users },
       { label: "Leaves", href: "/admin/leaves", icon: FileText },
+    ]
+  },
+  {
+    title: "Workforce",
+    items: [
+      { label: "Attendance", href: "/admin/attendance", icon: CalendarCheck },
+      { label: "Shifts", href: "/admin/shifts", icon: Clock },
+      { label: "Payroll", href: "/admin/payroll", icon: DollarSign },
     ]
   },
   {
@@ -96,6 +113,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -138,32 +156,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav className="flex flex-col gap-6 p-4 h-[calc(100vh-140px)] overflow-y-auto">
-            {adminNavGroups.map((group) => (
-              <div key={group.title} className="flex flex-col gap-1">
-                <h3 className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 mb-2">
-                  {group.title}
-                </h3>
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = pathname === item.href;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center gap-3 rounded-xl px-4 py-2 text-sm font-bold transition-all",
-                        isActive
-                          ? "bg-primary text-white shadow-md shadow-primary/10"
-                          : "text-muted-foreground hover:bg-primary/5 hover:text-primary"
-                      )}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
+            <NavItems pathname={pathname} onNavItemClick={() => { }} />
           </nav>
 
           <div className="absolute bottom-4 left-4 right-4 border-t pt-4">
@@ -185,14 +178,46 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         {showSidebar && (
           <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-white/80 px-4 backdrop-blur-md lg:px-8">
             <div className="flex items-center gap-4">
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <button className="lg:hidden p-2 hover:bg-muted rounded-lg transition-colors">
+                    <MenuIcon className="h-6 w-6" />
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-80 p-0 border-r shadow-xl">
+                  <SheetHeader className="p-6 border-b bg-white">
+                    <SheetTitle className="flex items-center gap-2">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20">
+                        <Coffee className="h-6 w-6" />
+                      </div>
+                      <span className="text-xl font-bold tracking-tight">CAFE REPUBLIC</span>
+                    </SheetTitle>
+                  </SheetHeader>
+                  <div className="flex flex-col h-[calc(100vh-80px)] overflow-y-auto p-4 bg-[#fafaf9]">
+                    <NavItems
+                      pathname={pathname}
+                      onNavItemClick={() => setIsMobileMenuOpen(false)}
+                    />
+                    <div className="mt-auto border-t pt-4 pb-6">
+                      <button
+                        onClick={() => {
+                          handleLogout();
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        <LogOut className="h-4.5 w-4.5" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
+
               <h2 className="text-lg font-bold">
                 {adminNavGroups.flatMap(g => g.items).find(i => i.href === pathname)?.label || "Admin"}
               </h2>
               <div className="h-4 w-[1px] bg-border hidden sm:block" />
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-primary/5 rounded-lg border border-primary/10">
-                <Store className="h-3.5 w-3.5 text-primary" />
-                <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Cafe Republic</span>
-              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -238,6 +263,40 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+    </div>
+  );
+}
+
+function NavItems({ pathname, onNavItemClick }: { pathname: string, onNavItemClick?: () => void }) {
+  return (
+    <div className="flex flex-col gap-6">
+      {adminNavGroups.map((group) => (
+        <div key={group.title} className="flex flex-col gap-1">
+          <h3 className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 mb-2">
+            {group.title}
+          </h3>
+          {group.items.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onNavItemClick}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl px-4 py-2 text-sm font-bold transition-all",
+                  isActive
+                    ? "bg-primary text-white shadow-md shadow-primary/10"
+                    : "text-muted-foreground hover:bg-primary/5 hover:text-primary"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import { 
-  TrendingUp, 
-  Users, 
-  ShoppingBag, 
+import {
+  TrendingUp,
+  Users,
+  ShoppingBag,
   DollarSign,
   ArrowUpRight,
   ArrowDownRight,
@@ -44,7 +44,10 @@ type Order = {
   payment_mode?: string;
 };
 
+import { useAdmin } from "@/context/AdminContext";
+
 export default function AdminOverview() {
+  const { selectedOutlet, user } = useAdmin();
   const [stats, setStats] = useState({
     todayRevenue: 0,
     liveOrders: 0,
@@ -61,7 +64,7 @@ export default function AdminOverview() {
     audioRef.current = new Audio('/notification.mp3');
     fetchStats();
     fetchRecentOrders();
-    
+
     const ordersSubscription = supabase
       .channel('admin_dashboard')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
@@ -82,34 +85,32 @@ export default function AdminOverview() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const { data: orders } = await supabase
+    let query = supabase
       .from("orders")
-      .select("total_price, status, created_at, updated_at")
+      .select("total_amount, status, created_at")
       .gte('created_at', today.toISOString());
+
+    if (!user?.is_super_admin && selectedOutlet) {
+      query = query.eq("outlet_id", selectedOutlet.id);
+    }
+
+    const { data: orders } = await query;
 
     if (orders) {
       const completed = orders.filter(o => o.status === 'completed');
       const cancelled = orders.filter(o => o.status === 'cancelled');
       const live = orders.filter(o => !['completed', 'cancelled'].includes(o.status));
-      const revenue = completed.reduce((acc, o) => acc + Number(o.total_price), 0);
-      
-      let totalPrepTime = 0;
-      let prepCount = 0;
-      completed.forEach(o => {
-        if (o.updated_at && o.created_at) {
-          const diff = (new Date(o.updated_at).getTime() - new Date(o.created_at).getTime()) / 60000;
-          if (diff > 0 && diff < 120) {
-            totalPrepTime += diff;
-            prepCount++;
-          }
-        }
-      });
+      const grossRevenue = completed.reduce((acc, o) => acc + (Number(o.total_amount) || 0), 0);
+
+      // Prep time calculation disabled due to missing updated_at column
+      const prepCount = 0;
+      const totalPrepTime = 0;
 
       const hourlyData: Record<string, number> = {};
       orders.forEach(o => {
         const hour = new Date(o.created_at).getHours();
         const label = `${hour.toString().padStart(2, '0')}:00`;
-        hourlyData[label] = (hourlyData[label] || 0) + Number(o.total_price);
+        hourlyData[label] = (hourlyData[label] || 0) + (Number(o.total_amount) || 0);
       });
 
       const chartArray = Object.entries(hourlyData)
@@ -122,9 +123,9 @@ export default function AdminOverview() {
         { name: "16:00", total: 0 },
         { name: "20:00", total: 0 },
       ]);
-      
+
       setStats({
-        todayRevenue: revenue,
+        todayRevenue: grossRevenue,
         liveOrders: live.length,
         totalOrders: orders.length,
         avgPrepTime: prepCount > 0 ? Math.round(totalPrepTime / prepCount) : 15,
@@ -135,11 +136,17 @@ export default function AdminOverview() {
   };
 
   const fetchRecentOrders = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from("orders")
       .select("*")
       .order('created_at', { ascending: false })
       .limit(10);
+
+    if (!user?.is_super_admin && selectedOutlet) {
+      query = query.eq("outlet_id", selectedOutlet.id);
+    }
+
+    const { data } = await query;
 
     if (data) {
       setRecentOrders(data);
@@ -167,37 +174,37 @@ export default function AdminOverview() {
   };
 
   const statCards = [
-    { 
-      label: "Today's Revenue", 
-      value: `₹${stats.todayRevenue.toFixed(0)}`, 
-      icon: DollarSign, 
+    {
+      label: "Today's Revenue",
+      value: `₹${stats.todayRevenue.toFixed(0)}`,
+      icon: DollarSign,
       color: "text-green-600",
       bg: "bg-green-100",
       trend: `${stats.completedOrders} completed`,
       isUp: true
     },
-    { 
-      label: "Live Orders", 
-      value: stats.liveOrders.toString(), 
-      icon: Bell, 
+    {
+      label: "Live Orders",
+      value: stats.liveOrders.toString(),
+      icon: Bell,
       color: "text-blue-600",
       bg: "bg-blue-100",
       trend: "Active now",
       isUp: true
     },
-    { 
-      label: "Total Orders", 
-      value: stats.totalOrders.toString(), 
-      icon: ShoppingBag, 
+    {
+      label: "Total Orders",
+      value: stats.totalOrders.toString(),
+      icon: ShoppingBag,
       color: "text-orange-600",
       bg: "bg-orange-100",
       trend: `${stats.cancelledOrders} cancelled`,
       isUp: stats.cancelledOrders === 0
     },
-    { 
-      label: "Avg Prep Time", 
-      value: `${stats.avgPrepTime}m`, 
-      icon: Clock, 
+    {
+      label: "Avg Prep Time",
+      value: `${stats.avgPrepTime}m`,
+      icon: Clock,
       color: "text-purple-600",
       bg: "bg-purple-100",
       trend: stats.avgPrepTime < 20 ? "Efficient" : "Normal",
@@ -248,59 +255,59 @@ export default function AdminOverview() {
         ))}
       </div>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          {/* Revenue Chart */}
-          <Card className="border-none shadow-sm rounded-[2.5rem] overflow-hidden">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold">Revenue Overview (Today)</CardTitle>
-            </CardHeader>
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+        {/* Revenue Chart */}
+        <Card className="border-none shadow-sm rounded-[2.5rem] overflow-hidden">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">Revenue Overview (Today)</CardTitle>
+          </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#7c2d12" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#7c2d12" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#7c2d12" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#7c2d12" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E8E1D9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} tickFormatter={(v) => `₹${v}`} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                   formatter={(v: any) => [`₹${v}`, 'Revenue']}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="total" 
-                  stroke="#7c2d12" 
+                <Area
+                  type="monotone"
+                  dataKey="total"
+                  stroke="#7c2d12"
                   strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorTotal)" 
+                  fillOpacity={1}
+                  fill="url(#colorTotal)"
                 />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-          {/* Hourly Orders */}
-          <Card className="border-none shadow-sm rounded-[2.5rem] overflow-hidden">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold">Hourly Performance</CardTitle>
-            </CardHeader>
+        {/* Hourly Orders */}
+        <Card className="border-none shadow-sm rounded-[2.5rem] overflow-hidden">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">Hourly Performance</CardTitle>
+          </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E8E1D9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} tickFormatter={(v) => `₹${v}`} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                   formatter={(v: any) => [`₹${v}`, 'Revenue']}
                 />
-                <Bar 
-                  dataKey="total" 
-                  fill="#ECD8B6" 
+                <Bar
+                  dataKey="total"
+                  fill="#ECD8B6"
                   radius={[6, 6, 0, 0]}
                   barSize={40}
                 />

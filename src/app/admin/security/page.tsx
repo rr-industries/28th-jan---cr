@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAdmin } from "@/context/AdminContext";
 import { format, differenceInMinutes, differenceInHours } from "date-fns";
+import dynamic from "next/dynamic";
 import {
     Shield,
     Activity,
@@ -19,8 +20,14 @@ import {
     MoreHorizontal,
     LogOut,
     Eye,
-    FileText
+    FileText,
+    Map
 } from "lucide-react";
+
+const SessionMap = dynamic(() => import("@/components/security/SessionMap"), {
+    ssr: false,
+    loading: () => <div className="h-[600px] w-full rounded-[2rem] bg-muted animate-pulse border-2" />
+});
 import { cn } from "@/lib/utils";
 import {
     Card,
@@ -59,23 +66,29 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 type AuditLog = {
     id: string;
     action: string;
-    entity: string;
-    details: any;
-    admin_user_id: string;
-    session_id: string;
-    created_at: string;
+    target: string;
+    metadata: any;
+    performed_by: string;
+    timestamp: string;
+    outlet_id?: string;
     severity?: 'low' | 'medium' | 'high';
 };
 
 type AdminSession = {
     id: string;
-    admin_user_id: string;
+    user_id: string;
     login_at: string;
     logout_at: string | null;
     ip_address: string;
     device_info: string;
     status: 'active' | 'logged_out' | 'expired';
-    risk_score?: number;
+    risk_level: 'low' | 'medium' | 'high';
+    country: string;
+    region: string;
+    city: string;
+    latitude: number;
+    longitude: number;
+    isp: string;
 };
 
 export default function SecurityCenter() {
@@ -94,22 +107,48 @@ export default function SecurityCenter() {
     // Selection
     const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
     const [selectedSession, setSelectedSession] = useState<AdminSession | null>(null);
+    const [alerts, setAlerts] = useState<any[]>([]);
+    const isSuperAdmin = user?.role?.toLowerCase() === 'super admin' || user?.role?.toLowerCase() === 'super_admin';
 
     useEffect(() => {
-        if (selectedOutlet) {
-            if (activeTab === "activity") fetchAuditLogs();
-            else fetchSessions();
+        if (user && isSuperAdmin) {
+            fetchSessions();
+            fetchAlerts();
+            fetchAuditLogs();
         }
-    }, [selectedOutlet, activeTab]);
+
+        // --- REAL-TIME SUBSCRIPTION ---
+        const sessionsChannel = supabase
+            .channel('security_updates')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'auth_sessions' }, (payload) => {
+                fetchSessions();
+            })
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'security_alerts' }, (payload) => {
+                fetchAlerts();
+                toast.warning(`Security Alert: ${payload.new.type}`, {
+                    description: payload.new.description
+                });
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(sessionsChannel);
+        };
+    }, [user, isSuperAdmin, selectedOutlet]);
 
     const fetchAuditLogs = async () => {
         setLoading(true);
         try {
             let query = supabase
                 .from("audit_logs")
-                .select("*")
-                .eq("outlet_id", selectedOutlet?.id)
-                .order("created_at", { ascending: false })
+                .select("*");
+
+            if (!user?.is_super_admin) {
+                query = query.eq("outlet_id", selectedOutlet?.id);
+            }
+
+            query = query
+                .order("timestamp", { ascending: false })
                 .limit(100);
 
             if (filterAction !== "all") {
@@ -137,10 +176,11 @@ export default function SecurityCenter() {
     const fetchSessions = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from("admin_sessions")
-                .select("*")
-                .eq("outlet_id", selectedOutlet?.id)
+            let query = supabase
+                .from("auth_sessions")
+                .select("*");
+
+            const { data, error } = await query
                 .order("login_at", { ascending: false })
                 .limit(50);
 
@@ -148,9 +188,27 @@ export default function SecurityCenter() {
             setSessions(data || []);
         } catch (e) {
             console.error(e);
-            toast.error("Failed to load sessions");
+            toast.error("Failed to load live sessions");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchAlerts = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('security_alerts')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(50);
+            if (error) throw error;
+            setAlerts(data || []);
+        } catch (error: any) {
+            const isRLSError = Object.keys(error || {}).length === 0 || error.code === '42501';
+            console.error('Failed to fetch alerts:', { error, isRLSError });
+            if (isRLSError) {
+                toast.error("Permission denied by system security rules.");
+            }
         }
     };
 
@@ -162,32 +220,38 @@ export default function SecurityCenter() {
     };
 
     const calculateDuration = (start: string, end: string | null) => {
-        if (!end) return "Active";
+        if (!end || end === start) return "Active";
         const minutes = differenceInMinutes(new Date(end), new Date(start));
+        if (minutes < 1) return "Just now";
         if (minutes < 60) return `${minutes}m`;
         return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
     };
 
     const handleForceLogout = async (sessionId: string) => {
-        if (user?.role !== 'Super Admin') {
+        if (user?.role !== 'Super Admin' && user?.role !== 'super_admin') {
             toast.error("Only Super Admins can force logout");
             return;
         }
 
         try {
-            const { error } = await supabase
-                .from("admin_sessions")
-                .update({ status: 'logged_out', logout_at: new Date().toISOString() })
-                .eq("id", sessionId);
+            // Call our secure backend API instead of direct DB update for better tracking
+            const response = await fetch("/api/security/force-logout", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+                },
+                body: JSON.stringify({ sessionId })
+            });
 
-            if (error) throw error;
+            if (!response.ok) throw new Error("API rejection");
 
             // Log this action
             await supabase.from("audit_logs").insert({
                 action: "FORCE_LOGOUT",
-                entity: "Session",
-                details: { target_session: sessionId },
-                admin_user_id: user.id,
+                target: "Sessions",
+                metadata: { target_session: sessionId },
+                performed_by: user.id,
                 outlet_id: selectedOutlet?.id
             });
 
@@ -222,9 +286,9 @@ export default function SecurityCenter() {
         if (selectedOutlet && user) {
             supabase.from("audit_logs").insert({
                 action: "EXPORT_DATA",
-                entity: "Security Logs",
-                details: { type: activeTab },
-                admin_user_id: user.id,
+                target: "Security Logs",
+                metadata: { type: activeTab },
+                performed_by: user.id,
                 outlet_id: selectedOutlet.id
             }).then(() => { }); // Fire and forget
         }
@@ -293,7 +357,11 @@ export default function SecurityCenter() {
                     </TabsTrigger>
                     <TabsTrigger value="access" className="rounded-xl px-6 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                         <Lock className="h-4 w-4 mr-2" />
-                        Access Logs (Logins)
+                        Access Logs
+                    </TabsTrigger>
+                    <TabsTrigger value="map" className="rounded-xl px-6 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+                        <Map className="h-4 w-4 mr-2" />
+                        Session Map
                     </TabsTrigger>
                 </TabsList>
 
@@ -341,15 +409,15 @@ export default function SecurityCenter() {
                                     {filteredLogs.map((log) => (
                                         <tr key={log.id} className="hover:bg-muted/5 group">
                                             <td className="p-4 whitespace-nowrap text-muted-foreground">
-                                                {format(new Date(log.created_at), "MMM dd, HH:mm:ss")}
+                                                {format(new Date(log.timestamp), "MMM dd, HH:mm:ss")}
                                             </td>
                                             <td className="p-4 font-bold">
                                                 <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-mono">
                                                     {log.action}
                                                 </span>
                                             </td>
-                                            <td className="p-4 text-xs font-mono">{log.admin_user_id.substring(0, 8)}...</td>
-                                            <td className="p-4">{log.entity}</td>
+                                            <td className="p-4 text-xs font-mono">{log.performed_by?.substring(0, 8)}...</td>
+                                            <td className="p-4">{log.target}</td>
                                             <td className="p-4 text-center">
                                                 <Badge
                                                     variant="outline"
@@ -386,57 +454,92 @@ export default function SecurityCenter() {
                             <table className="w-full text-sm">
                                 <thead className="bg-muted/30 border-b">
                                     <tr>
-                                        <th className="text-left p-4 font-bold text-xs uppercase tracking-wider">Status</th>
-                                        <th className="text-left p-4 font-bold text-xs uppercase tracking-wider">User</th>
                                         <th className="text-left p-4 font-bold text-xs uppercase tracking-wider">Login Time</th>
-                                        <th className="text-left p-4 font-bold text-xs uppercase tracking-wider">Duration</th>
-                                        <th className="text-left p-4 font-bold text-xs uppercase tracking-wider">IP / Device</th>
-                                        <th className="text-right p-4 font-bold text-xs uppercase tracking-wider">Actions</th>
+                                        <th className="text-left p-4 font-bold text-xs uppercase tracking-wider">Admin ID</th>
+                                        <th className="text-left p-4 font-bold text-xs uppercase tracking-wider">Location</th>
+                                        <th className="text-left p-4 font-bold text-xs uppercase tracking-wider">IP / ISP</th>
+                                        <th className="text-center p-4 font-bold text-xs uppercase tracking-wider">Risk</th>
+                                        <th className="text-right p-4 font-bold text-xs uppercase tracking-wider">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
                                     {sessions.map((session) => (
                                         <tr key={session.id} className="hover:bg-muted/5">
-                                            <td className="p-4">
-                                                <Badge variant="outline" className={cn(
-                                                    session.status === 'active' ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-500"
-                                                )}>
-                                                    {session.status}
-                                                </Badge>
-                                            </td>
-                                            <td className="p-4 font-mono text-xs">{session.admin_user_id.substring(0, 8)}...</td>
-                                            <td className="p-4">{format(new Date(session.login_at), "MMM dd, HH:mm")}</td>
-                                            <td className="p-4 font-mono text-muted-foreground">
-                                                {calculateDuration(session.login_at, session.logout_at)}
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="flex flex-col text-xs">
-                                                    <span className="font-bold flex items-center gap-1"><Globe className="h-3 w-3" /> {session.ip_address}</span>
-                                                    <span className="text-muted-foreground truncate max-w-[150px]">{session.device_info}</span>
+                                            <td className="p-4 whitespace-nowrap">
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold">{format(new Date(session.login_at), "MMM dd")}</span>
+                                                    <span className="text-[10px] text-muted-foreground">{format(new Date(session.login_at), "HH:mm:ss")}</span>
                                                 </div>
                                             </td>
+                                            <td className="p-4">
+                                                <div className="flex flex-col">
+                                                    <span className="font-mono text-xs">{session.user_id.substring(0, 12)}...</span>
+                                                    <span className="text-[10px] text-muted-foreground uppercase">{session.device_info.split(' ')[0]}</span>
+                                                </div>
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="flex items-center gap-1 font-medium">
+                                                    <Globe className="h-3 w-3 text-blue-500" />
+                                                    {session.city || "Unknown"}, {session.country || "Unknown"}
+                                                </div>
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="flex flex-col text-[10px]">
+                                                    <span className="font-mono">{session.ip_address}</span>
+                                                    <span className="text-muted-foreground truncate max-w-[120px]">{session.isp}</span>
+                                                </div>
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                <Badge
+                                                    variant="outline"
+                                                    className={cn(
+                                                        "uppercase text-[10px]",
+                                                        session.risk_level === 'high' ? "bg-red-100 text-red-700 border-red-200" :
+                                                            session.risk_level === 'medium' ? "bg-orange-100 text-orange-700 border-orange-200" :
+                                                                "bg-green-100 text-green-700 border-green-200"
+                                                    )}
+                                                >
+                                                    {session.risk_level}
+                                                </Badge>
+                                            </td>
                                             <td className="p-4 text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    {session.status === 'active' && (
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <Badge variant="outline" className={cn(
+                                                        session.status === 'active'
+                                                            ? "bg-green-100 text-green-700 border-green-200"
+                                                            : "bg-gray-100 text-gray-600 border-gray-200"
+                                                    )}>
+                                                        {session.status}
+                                                    </Badge>
+                                                    {session.status === 'active' && user?.role === 'Super Admin' && (
                                                         <Button
-                                                            variant="destructive"
-                                                            size="sm"
-                                                            className="h-7 text-xs"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
                                                             onClick={() => handleForceLogout(session.id)}
                                                         >
-                                                            <LogOut className="h-3 w-3 mr-1" />
-                                                            Kill Session
+                                                            <LogOut className="h-4 w-4" />
                                                         </Button>
                                                     )}
-                                                    <Button variant="ghost" size="sm" className="h-7 text-xs">View Activity</Button>
                                                 </div>
                                             </td>
                                         </tr>
                                     ))}
+                                    {sessions.length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="text-center p-12 text-muted-foreground">
+                                                No sessions found
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
                     </Card>
+                </TabsContent>
+
+                <TabsContent value="map">
+                    <SessionMap sessions={sessions as any} />
                 </TabsContent>
             </Tabs>
 
@@ -455,14 +558,14 @@ export default function SecurityCenter() {
                             </div>
                             <div className="p-3 bg-muted rounded-xl">
                                 <span className="text-xs font-bold uppercase text-muted-foreground">Entity</span>
-                                <p className="font-bold">{selectedLog?.entity}</p>
+                                <p className="font-bold">{selectedLog?.target}</p>
                             </div>
                         </div>
 
                         <div>
                             <span className="text-xs font-bold uppercase text-muted-foreground mb-2 block">JSON Payload</span>
                             <ScrollArea className="h-[200px] w-full rounded-xl border bg-slate-950 p-4 text-slate-50 font-mono text-xs">
-                                <pre>{JSON.stringify(selectedLog?.details, null, 2)}</pre>
+                                <pre>{JSON.stringify(selectedLog?.metadata, null, 2)}</pre>
                             </ScrollArea>
                         </div>
                     </div>

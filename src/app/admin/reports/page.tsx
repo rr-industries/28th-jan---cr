@@ -77,7 +77,7 @@ export default function AdminReports() {
       }
 
       // Fetch Orders with standardized fields
-      const { data: orders, error: ordersError } = await supabase
+      let query = supabase
         .from("orders")
         .select(`
           *,
@@ -86,9 +86,13 @@ export default function AdminReports() {
             menu_items (name, category)
           )
         `)
-        .eq('outlet_id', selectedOutlet.id)
-        .gte('created_at', startDate.toISOString())
-        .order('created_at', { ascending: true });
+        .gte('created_at', startDate.toISOString());
+
+      if (!user?.is_super_admin) {
+        query = query.eq('outlet_id', selectedOutlet.id);
+      }
+
+      const { data: orders, error: ordersError } = await query.order('created_at', { ascending: true });
 
       if (ordersError) throw ordersError;
 

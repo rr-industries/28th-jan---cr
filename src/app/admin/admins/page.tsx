@@ -2,15 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { 
-  Users, 
-  Plus, 
-  Search, 
-  Shield, 
-  Store, 
-  Check, 
-  X, 
-  ChevronRight, 
+import {
+  Users,
+  Plus,
+  Search,
+  Shield,
+  Store,
+  Check,
+  X,
+  ChevronRight,
   LoaderCircle,
   Trash2,
   Edit2,
@@ -26,12 +26,12 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useAdmin } from "@/context/AdminContext";
 import { cn } from "@/lib/utils";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -61,7 +61,7 @@ export default function AdminManagementPage() {
   const [permissions, setPermissions] = useState<PermissionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // Modals
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
@@ -119,7 +119,7 @@ export default function AdminManagementPage() {
   const openPermissions = async (user: UserRecord, outlet: OutletRecord) => {
     setSelectedUser(user);
     setSelectedOutletForPerms(outlet);
-    
+
     const { data } = await supabase
       .from("user_outlets")
       .select("permissions")
@@ -165,20 +165,20 @@ export default function AdminManagementPage() {
     <div className="space-y-8 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-            <h1 className="text-3xl font-serif font-bold tracking-tight">Admin & Permissions</h1>
-            <p className="text-muted-foreground font-medium flex items-center gap-2 mt-1">
-              <Shield className="h-4 w-4 text-primary" />
-              Manage staff access across all outlets
-            </p>
-          </div>
-          <div className="flex gap-2 w-full md:w-auto">
-            <Button 
-              onClick={() => window.location.href = '/admin/employees?add=true'}
-              className="h-12 rounded-2xl shadow-lg shadow-primary/20 px-8 font-bold"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Add Employee
-            </Button>
+          <h1 className="text-3xl font-serif font-bold tracking-tight">Admin & Permissions</h1>
+          <p className="text-muted-foreground font-medium flex items-center gap-2 mt-1">
+            <Shield className="h-4 w-4 text-primary" />
+            Manage system-wide staff access and permissions
+          </p>
+        </div>
+        <div className="flex gap-2 w-full md:w-auto">
+          <Button
+            onClick={() => window.location.href = '/admin/employees?add=true'}
+            className="h-12 rounded-2xl shadow-lg shadow-primary/20 px-8 font-bold"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Add Employee
+          </Button>
         </div>
       </div>
 
@@ -186,8 +186,8 @@ export default function AdminManagementPage() {
         <div className="bg-white p-6 rounded-[2.5rem] shadow-[0_10px_40px_rgba(0,0,0,0.04)] border border-gray-100">
           <div className="relative">
             <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
-            <Input 
-              placeholder="Search staff by name or ID..." 
+            <Input
+              placeholder="Search staff by name or ID..."
               className="h-12 pl-12 rounded-2xl bg-muted/30 border-none focus:ring-primary font-medium"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -237,24 +237,18 @@ export default function AdminManagementPage() {
                     <div className="space-y-3">
                       <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] px-1">Permissions Scope</p>
                       <div className="flex flex-wrap gap-2">
-                        {outlets.map(outlet => (
-                          <button
-                            key={outlet.id}
-                            onClick={() => openPermissions(user, outlet)}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-primary/5 bg-primary/5 hover:bg-primary/10 hover:border-primary/20 transition-all text-xs font-bold w-full justify-between group"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Store className="h-3.5 w-3.5 text-primary" />
-                              <span>{outlet.name}</span>
-                            </div>
-                            <Settings className="h-3.5 w-3.5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </button>
-                        ))}
+                        <Button
+                          onClick={() => outlets[0] && openPermissions(user, outlets[0])}
+                          className="w-full h-11 rounded-xl font-bold bg-primary/5 text-primary hover:bg-primary/10 border-2 border-primary/10 shadow-none"
+                        >
+                          <Settings className="h-4 w-4 mr-2" />
+                          Manage System Rights
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-            ))}
+              ))}
           </div>
         </div>
 
@@ -300,24 +294,18 @@ export default function AdminManagementPage() {
                     <div className="space-y-3">
                       <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] px-1">Access Control</p>
                       <div className="flex flex-wrap gap-2">
-                        {outlets.map(outlet => (
-                          <button
-                            key={outlet.id}
-                            onClick={() => openPermissions(user, outlet)}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-primary/5 bg-primary/5 hover:bg-primary/10 hover:border-primary/20 transition-all text-xs font-bold w-full justify-between group"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Store className="h-3.5 w-3.5 text-primary" />
-                              <span>{outlet.name}</span>
-                            </div>
-                            <Shield className="h-3.5 w-3.5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </button>
-                        ))}
+                        <Button
+                          onClick={() => outlets[0] && openPermissions(user, outlets[0])}
+                          className="w-full h-11 rounded-xl font-bold bg-muted/50 text-muted-foreground hover:bg-muted/80 border-2 border-transparent shadow-none"
+                        >
+                          <Shield className="h-4 w-4 mr-2" />
+                          Configure Access
+                        </Button>
                       </div>
                     </div>
                     <div className="flex gap-2 pt-2">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         onClick={() => window.location.href = `/admin/employees?edit=${user.id}`}
                         className="flex-1 rounded-2xl h-12 border-2 font-bold"
                       >
@@ -327,7 +315,7 @@ export default function AdminManagementPage() {
                     </div>
                   </CardContent>
                 </Card>
-            ))}
+              ))}
           </div>
         </div>
       </div>
@@ -372,82 +360,82 @@ export default function AdminManagementPage() {
                     </div>
                     <div className="flex-1 h-px bg-gradient-to-r from-primary/20 to-transparent ml-4" />
                   </div>
-                  
-                    <div className="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                              <tr className="bg-primary/[0.03] text-[11px] font-black uppercase tracking-[0.25em] text-primary/70 border-b border-primary/10">
-                                <th className="p-8 w-24 text-center">Security Status</th>
-                                <th className="p-8">Capability / Module Access</th>
-                                <th className="p-8">Protocol ID</th>
-                                <th className="p-8 text-right w-32">Status Toggle</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-primary/5">
-                              {permissions.filter(p => p.section === section).map(perm => (
-                                <tr 
-                                  key={perm.key}
-                                  onClick={() => togglePermission(perm.key)}
-                                  className={cn(
-                                    "group cursor-pointer transition-all duration-300 hover:bg-primary/[0.02]",
-                                    userPermissions[perm.key] ? "bg-primary/[0.01]" : ""
-                                  )}
-                                >
-                                  <td className="p-8 text-center">
+
+                  <div className="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-primary/[0.03] text-[11px] font-black uppercase tracking-[0.25em] text-primary/70 border-b border-primary/10">
+                            <th className="p-8 w-24 text-center">Security Status</th>
+                            <th className="p-8">Capability / Module Access</th>
+                            <th className="p-8">Protocol ID</th>
+                            <th className="p-8 text-right w-32">Status Toggle</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-primary/5">
+                          {permissions.filter(p => p.section === section).map(perm => (
+                            <tr
+                              key={perm.key}
+                              onClick={() => togglePermission(perm.key)}
+                              className={cn(
+                                "group cursor-pointer transition-all duration-300 hover:bg-primary/[0.02]",
+                                userPermissions[perm.key] ? "bg-primary/[0.01]" : ""
+                              )}
+                            >
+                              <td className="p-8 text-center">
+                                <div className={cn(
+                                  "h-12 w-12 rounded-[1.25rem] flex items-center justify-center transition-all duration-500 shadow-sm mx-auto border-2",
+                                  userPermissions[perm.key]
+                                    ? "bg-primary text-white border-primary scale-110 shadow-xl shadow-primary/30"
+                                    : "bg-muted text-muted-foreground border-transparent group-hover:border-muted-foreground/30"
+                                )}>
+                                  {userPermissions[perm.key] ? <Check className="h-6 w-6 stroke-[3.5]" /> : <Lock className="h-5 w-5 opacity-40" />}
+                                </div>
+                              </td>
+                              <td className="p-8">
+                                <p className={cn(
+                                  "text-lg font-bold transition-colors duration-300",
+                                  userPermissions[perm.key] ? "text-primary" : "text-gray-900"
+                                )}>
+                                  {perm.description}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1.5">
+                                  <div className={cn(
+                                    "h-1.5 w-1.5 rounded-full animate-pulse",
+                                    userPermissions[perm.key] ? "bg-green-500" : "bg-red-400"
+                                  )} />
+                                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">
+                                    {userPermissions[perm.key] ? "Access Profile: Active" : "Access Profile: Locked"}
+                                  </p>
+                                </div>
+                              </td>
+                              <td className="p-8">
+                                <div className="inline-flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-xl border border-muted-foreground/10">
+                                  <Shield className="h-3 w-3 text-muted-foreground/50" />
+                                  <code className="text-[11px] font-mono font-black text-muted-foreground uppercase">
+                                    {perm.key}
+                                  </code>
+                                </div>
+                              </td>
+                              <td className="p-8 text-right">
+                                <div className="flex justify-end">
+                                  <div className={cn(
+                                    "w-14 h-7 rounded-full transition-all duration-500 relative p-1 cursor-pointer ring-4 ring-transparent group-hover:ring-primary/5",
+                                    userPermissions[perm.key] ? "bg-primary shadow-inner shadow-black/20" : "bg-gray-200"
+                                  )}>
                                     <div className={cn(
-                                      "h-12 w-12 rounded-[1.25rem] flex items-center justify-center transition-all duration-500 shadow-sm mx-auto border-2",
-                                      userPermissions[perm.key] 
-                                        ? "bg-primary text-white border-primary scale-110 shadow-xl shadow-primary/30" 
-                                        : "bg-muted text-muted-foreground border-transparent group-hover:border-muted-foreground/30"
-                                    )}>
-                                      {userPermissions[perm.key] ? <Check className="h-6 w-6 stroke-[3.5]" /> : <Lock className="h-5 w-5 opacity-40" />}
-                                    </div>
-                                  </td>
-                                  <td className="p-8">
-                                    <p className={cn(
-                                      "text-lg font-bold transition-colors duration-300",
-                                      userPermissions[perm.key] ? "text-primary" : "text-gray-900"
-                                    )}>
-                                      {perm.description}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                      <div className={cn(
-                                        "h-1.5 w-1.5 rounded-full animate-pulse",
-                                        userPermissions[perm.key] ? "bg-green-500" : "bg-red-400"
-                                      )} />
-                                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">
-                                        {userPermissions[perm.key] ? "Access Profile: Active" : "Access Profile: Locked"}
-                                      </p>
-                                    </div>
-                                  </td>
-                                  <td className="p-8">
-                                    <div className="inline-flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-xl border border-muted-foreground/10">
-                                      <Shield className="h-3 w-3 text-muted-foreground/50" />
-                                      <code className="text-[11px] font-mono font-black text-muted-foreground uppercase">
-                                        {perm.key}
-                                      </code>
-                                    </div>
-                                  </td>
-                                  <td className="p-8 text-right">
-                                    <div className="flex justify-end">
-                                      <div className={cn(
-                                        "w-14 h-7 rounded-full transition-all duration-500 relative p-1 cursor-pointer ring-4 ring-transparent group-hover:ring-primary/5",
-                                        userPermissions[perm.key] ? "bg-primary shadow-inner shadow-black/20" : "bg-gray-200"
-                                      )}>
-                                        <div className={cn(
-                                          "w-5 h-5 bg-white rounded-full shadow-2xl transition-all duration-500",
-                                          userPermissions[perm.key] ? "translate-x-7 scale-110" : "translate-x-0"
-                                        )} />
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                        </table>
-                      </div>
+                                      "w-5 h-5 bg-white rounded-full shadow-2xl transition-all duration-500",
+                                      userPermissions[perm.key] ? "translate-x-7 scale-110" : "translate-x-0"
+                                    )} />
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
+                  </div>
 
                 </div>
               ))}
@@ -456,14 +444,14 @@ export default function AdminManagementPage() {
 
           <DialogFooter className="p-10 border-t bg-white">
             <div className="flex w-full gap-6">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setShowPermissionsModal(false)}
                 className="flex-1 h-16 rounded-[1.5rem] font-bold border-2 hover:bg-muted/50 text-gray-500"
               >
                 Discard Changes
               </Button>
-              <Button 
+              <Button
                 onClick={savePermissions}
                 className="flex-[2] h-16 rounded-[1.5rem] font-black text-lg uppercase tracking-widest shadow-2xl shadow-primary/30 active:scale-[0.98] transition-transform"
               >

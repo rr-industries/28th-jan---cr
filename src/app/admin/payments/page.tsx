@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { 
-  CreditCard, 
-  Banknote, 
-  Smartphone, 
-  Search, 
-  Filter, 
+import {
+  CreditCard,
+  Banknote,
+  Smartphone,
+  Search,
+  Filter,
   Calendar,
   Download,
   RefreshCw,
@@ -41,7 +41,7 @@ type Payment = {
 };
 
 export default function PaymentsPage() {
-  const { selectedOutlet, hasPermission } = useAdmin();
+  const { selectedOutlet, user, hasPermission } = useAdmin();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,9 +65,13 @@ export default function PaymentsPage() {
             customer_name,
             table_number
           )
-        `)
-        .eq("outlet_id", selectedOutlet.id)
-        .order("created_at", { ascending: false });
+        `);
+
+      if (!user?.is_super_admin) {
+        query = query.eq("outlet_id", selectedOutlet.id);
+      }
+
+      query = query.order("created_at", { ascending: false });
 
       if (methodFilter !== "all") {
         query = query.eq("method", methodFilter);
@@ -83,7 +87,7 @@ export default function PaymentsPage() {
     }
   };
 
-  const filteredPayments = payments.filter(p => 
+  const filteredPayments = payments.filter(p =>
     (p.bills?.customer_name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
     (p.bills?.bill_number?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
     (p.transaction_id?.toLowerCase() || "").includes(searchTerm.toLowerCase())
@@ -142,8 +146,8 @@ export default function PaymentsPage() {
             <label className="text-[10px] font-bold uppercase text-muted-foreground ml-2">Search Transaction</label>
             <div className="relative">
               <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-              <Input 
-                placeholder="Search by Bill No, Customer or TXN ID..." 
+              <Input
+                placeholder="Search by Bill No, Customer or TXN ID..."
                 className="pl-10 h-12 rounded-2xl border-muted bg-muted/20 focus:bg-white transition-all"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -152,7 +156,7 @@ export default function PaymentsPage() {
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase text-muted-foreground ml-2">Payment Method</label>
-            <select 
+            <select
               className="w-full h-12 rounded-2xl border border-muted bg-muted/20 px-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
               value={methodFilter}
               onChange={(e) => setMethodFilter(e.target.value)}

@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { 
-  Search, 
-  Receipt, 
-  Printer, 
-  User, 
-  Phone, 
+import {
+  Search,
+  Receipt,
+  Printer,
+  User,
+  Phone,
   UserCircle,
   LoaderCircle,
   CheckCircle2,
@@ -71,7 +71,7 @@ type RecentInvoice = {
 };
 
 export default function BillingsPage() {
-  const { selectedOutlet, hasPermission } = useAdmin();
+  const { selectedOutlet, user, hasPermission } = useAdmin();
   const [tableSearch, setTableSearch] = useState("");
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
@@ -93,10 +93,15 @@ export default function BillingsPage() {
 
   const fetchRecentInvoices = async () => {
     if (!selectedOutlet) return;
-    const { data, error } = await supabase
+    let query = supabase
       .from("bills")
-      .select("*")
-      .eq("outlet_id", selectedOutlet.id)
+      .select("*");
+
+    if (!user?.is_super_admin) {
+      query = query.eq("outlet_id", selectedOutlet.id);
+    }
+
+    const { data, error } = await query
       .order("created_at", { ascending: false })
       .limit(20);
 
@@ -123,7 +128,7 @@ export default function BillingsPage() {
     setActiveOrder(null);
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("orders")
         .select(`
           *,
@@ -135,9 +140,14 @@ export default function BillingsPage() {
           ),
           cafe_tables!inner(table_number)
         `)
-        .eq("outlet_id", selectedOutlet.id)
         .eq("cafe_tables.table_number", tableSearch)
-        .not("status", "in", '("completed","cancelled")')
+        .not("status", "in", '("completed","cancelled")');
+
+      if (!user?.is_super_admin) {
+        query = query.eq("outlet_id", selectedOutlet.id);
+      }
+
+      const { data, error } = await query
         .order("created_at", { ascending: false })
         .limit(1);
 
@@ -175,7 +185,7 @@ export default function BillingsPage() {
     try {
       const today = new Date().toISOString().split('T')[0];
       const invoiceNumber = `INV-${today.replace(/-/g, "")}-${activeOrder.id.slice(0, 4).toUpperCase()}`;
-      
+
       const subtotal = Number(activeOrder.total_amount) / 1.05;
       const taxAmount = Number(activeOrder.total_amount) - subtotal;
 
@@ -212,7 +222,7 @@ export default function BillingsPage() {
         .from("orders")
         .update({ status: 'completed' })
         .eq('id', activeOrder.id);
-      
+
       if (orderUpdateError) throw orderUpdateError;
 
       // Make table available
@@ -289,7 +299,7 @@ export default function BillingsPage() {
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-                    <Input 
+                    <Input
                       placeholder="e.g. 5"
                       value={tableSearch}
                       onChange={(e) => setTableSearch(e.target.value)}
@@ -305,7 +315,7 @@ export default function BillingsPage() {
 
               <AnimatePresence mode="wait">
                 {activeOrder ? (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
@@ -331,8 +341,8 @@ export default function BillingsPage() {
                       ))}
                     </div>
 
-                    <Button 
-                      className="w-full h-14 text-lg font-bold rounded-2xl shadow-xl shadow-primary/30" 
+                    <Button
+                      className="w-full h-14 text-lg font-bold rounded-2xl shadow-xl shadow-primary/30"
                       onClick={() => setShowInvoiceModal(true)}
                     >
                       <Receipt className="mr-2 h-6 w-6" />
@@ -351,100 +361,100 @@ export default function BillingsPage() {
         </div>
 
         {/* Recently Billed Section */}
-          <div className="lg:col-span-8">
-            <Card className="border-none shadow-xl h-full overflow-hidden rounded-[2.5rem]">
-              <CardHeader className="flex flex-row items-center justify-between bg-muted/20 pb-4">
-                <div>
-                  <CardTitle className="flex items-center gap-3 text-2xl font-serif">
-                    <CheckCircle2 className="h-7 w-7 text-green-500" />
-                    Recently Billed
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground mt-1">Last 20 invoices in {selectedOutlet?.name}</p>
+        <div className="lg:col-span-8">
+          <Card className="border-none shadow-xl h-full overflow-hidden rounded-[2.5rem]">
+            <CardHeader className="flex flex-row items-center justify-between bg-muted/20 pb-4">
+              <div>
+                <CardTitle className="flex items-center gap-3 text-2xl font-serif">
+                  <CheckCircle2 className="h-7 w-7 text-green-500" />
+                  Recently Billed
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">Last 20 invoices in {selectedOutlet?.name}</p>
+              </div>
+              <div className="flex gap-2">
+                <div className="relative w-48 hidden md:block">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search history..."
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    className="h-9 pl-8 rounded-2xl text-xs"
+                  />
                 </div>
-                <div className="flex gap-2">
-                  <div className="relative w-48 hidden md:block">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      placeholder="Search history..." 
-                      value={historySearch}
-                      onChange={(e) => setHistorySearch(e.target.value)}
-                      className="h-9 pl-8 rounded-2xl text-xs"
-                    />
-                  </div>
-                  <Button variant="outline" size="icon" className="rounded-2xl" onClick={fetchRecentInvoices}>
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-muted">
-                  {recentInvoices.filter(inv => inv.table_number.toString().includes(historySearch) || inv.customer_name.toLowerCase().includes(historySearch.toLowerCase())).map((inv) => (
-                    <div key={inv.id} className="bg-white p-6 hover:bg-muted/10 transition-colors border-b md:border-r">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="space-y-1">
-                          <Badge variant="outline" className="text-[9px] font-mono font-bold tracking-tighter rounded-xl py-0 px-1.5 uppercase">
-                            {inv.invoice_number}
-                          </Badge>
-                          <h4 className="font-bold text-xl flex items-center gap-2">
-                            Table {inv.table_number}
-                          </h4>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-serif font-bold text-primary">₹{Number(inv.total_amount).toFixed(0)}</p>
-                          <p className="text-[10px] font-bold uppercase text-muted-foreground">{inv.payment_mode}</p>
-                        </div>
+                <Button variant="outline" size="icon" className="rounded-2xl" onClick={fetchRecentInvoices}>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-muted">
+                {recentInvoices.filter(inv => inv.table_number.toString().includes(historySearch) || inv.customer_name.toLowerCase().includes(historySearch.toLowerCase())).map((inv) => (
+                  <div key={inv.id} className="bg-white p-6 hover:bg-muted/10 transition-colors border-b md:border-r">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="space-y-1">
+                        <Badge variant="outline" className="text-[9px] font-mono font-bold tracking-tighter rounded-xl py-0 px-1.5 uppercase">
+                          {inv.invoice_number}
+                        </Badge>
+                        <h4 className="font-bold text-xl flex items-center gap-2">
+                          Table {inv.table_number}
+                        </h4>
                       </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-2 text-xs">
-                            <User className="h-3 w-3 text-muted-foreground" />
-                            <span className="font-bold truncate">{inv.customer_name}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs">
-                            <Phone className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-muted-foreground">{inv.customer_phone}</span>
-                          </div>
-                        </div>
-                        <div className="space-y-1.5 text-right">
-                          <p className="text-[10px] font-bold text-muted-foreground uppercase">Cashier</p>
-                          <p className="text-xs font-bold">{inv.cashier_name}</p>
-                        </div>
-                      </div>
-  
-                      <div className="flex justify-between items-center pt-4 border-t border-muted">
-                        <span className="text-[10px] text-muted-foreground font-medium">
-                          {new Date(inv.generated_at).toLocaleString('en-IN', {
-                            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true
-                          })}
-                        </span>
-                        <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            className="h-8 px-3 rounded-xl text-[10px] font-bold uppercase shadow-sm" 
-                              onClick={() => generateInvoicePDF({
-                                invoiceNumber: inv.invoice_number,
-                                tableNumber: parseInt(inv.table_number, 10) || 0,
-                                date: new Date(inv.generated_at).toLocaleString(),
-                                customerName: inv.customer_name,
-                                customerNumber: inv.customer_phone,
-                                cashierName: inv.cashier_name,
-                                items: inv.items,
-                                total: Number(inv.total_amount),
-                                paymentMode: inv.payment_mode
-                              })}
-                          >
-                            <Printer className="h-3.5 w-3.5 mr-1.5" />
-                            Print
-                          </Button>
-                        </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-serif font-bold text-primary">₹{Number(inv.total_amount).toFixed(0)}</p>
+                        <p className="text-[10px] font-bold uppercase text-muted-foreground">{inv.payment_mode}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 text-xs">
+                          <User className="h-3 w-3 text-muted-foreground" />
+                          <span className="font-bold truncate">{inv.customer_name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <Phone className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-muted-foreground">{inv.customer_phone}</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5 text-right">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Cashier</p>
+                        <p className="text-xs font-bold">{inv.cashier_name}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-4 border-t border-muted">
+                      <span className="text-[10px] text-muted-foreground font-medium">
+                        {new Date(inv.generated_at).toLocaleString('en-IN', {
+                          day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true
+                        })}
+                      </span>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="h-8 px-3 rounded-xl text-[10px] font-bold uppercase shadow-sm"
+                          onClick={() => generateInvoicePDF({
+                            invoiceNumber: inv.invoice_number,
+                            tableNumber: parseInt(inv.table_number, 10) || 0,
+                            date: new Date(inv.generated_at).toLocaleString(),
+                            customerName: inv.customer_name,
+                            customerNumber: inv.customer_phone,
+                            cashierName: inv.cashier_name,
+                            items: inv.items,
+                            total: Number(inv.total_amount),
+                            paymentMode: inv.payment_mode
+                          })}
+                        >
+                          <Printer className="h-3.5 w-3.5 mr-1.5" />
+                          Print
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
@@ -468,7 +478,7 @@ export default function BillingsPage() {
                 <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Customer Name</label>
                 <div className="relative">
                   <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
+                  <Input
                     placeholder="Enter name"
                     className="pl-10 h-11 rounded-xl"
                     value={customerName}
@@ -480,7 +490,7 @@ export default function BillingsPage() {
                 <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Mobile Number</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
+                  <Input
                     placeholder="10 digits"
                     type="tel"
                     className="pl-10 h-11 rounded-xl"
@@ -495,7 +505,7 @@ export default function BillingsPage() {
               <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Cashier Name</label>
               <div className="relative">
                 <UserCircle className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input 
+                <Input
                   placeholder="Billing Agent Name"
                   className="pl-10 h-11 rounded-xl"
                   value={cashierName}
@@ -517,8 +527,8 @@ export default function BillingsPage() {
                     onClick={() => setPaymentMode(mode.id)}
                     className={cn(
                       "flex flex-col items-center gap-2 rounded-2xl border-2 p-3 transition-all",
-                      paymentMode === mode.id 
-                        ? "border-primary bg-primary/5 text-primary scale-105" 
+                      paymentMode === mode.id
+                        ? "border-primary bg-primary/5 text-primary scale-105"
                         : "border-muted hover:border-primary/20 hover:bg-primary/5"
                     )}
                   >

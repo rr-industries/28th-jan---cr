@@ -99,7 +99,7 @@ export default function MenuManagement() {
     is_global: true
   });
 
-  const { selectedOutlet } = useAdmin();
+  const { selectedOutlet, user } = useAdmin();
 
   useEffect(() => {
     fetchItems();
@@ -110,7 +110,9 @@ export default function MenuManagement() {
     setLoading(true);
     let query = supabase.from("menu_items").select("*");
 
-    if (selectedOutlet) {
+    if (user?.is_super_admin) {
+      // Super Admin sees everything
+    } else if (selectedOutlet) {
       query = query.or(`outlet_id.is.null,outlet_id.eq.${selectedOutlet.id}`);
     } else {
       query = query.eq("is_global", true);

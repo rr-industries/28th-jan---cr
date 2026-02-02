@@ -23,46 +23,34 @@ export default function AdminLoginPage() {
     setError("");
 
     try {
-      const { data: employeeData, error: rpcError } = await supabase.rpc('check_employee_login', {
-        p_identifier: identifier.trim(),
-        p_password: password.trim()
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier,
+          password,
+          deviceInfo: navigator.userAgent
+        })
       });
 
-      if (rpcError) {
-        console.error("RPC Error:", rpcError);
-        setError(`Login verification failed: ${rpcError.message}`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || "Authentication failed");
         setLoading(false);
         return;
       }
 
-      if (!employeeData || employeeData.length === 0) {
-        setError("Invalid identifier or security key.");
-        setLoading(false);
-        return;
-      }
+      // Set the session on the client manually after server-side success
+      const { error: sessionSetError } = await supabase.auth.setSession(result.session);
 
-      const employee = employeeData[0];
-      if (!employee.is_active) {
-        setError("Account deactivated.");
-        setLoading(false);
-        return;
-      }
-
-      const { data: outlets } = await supabase.from('outlets').select('id, name').limit(1);
-
-      localStorage.setItem('employee_session', JSON.stringify({
-        id: employee.id,
-        employee_id: employee.employee_id,
-        name: employee.name,
-        role: employee.role,
-        outlet_id: outlets?.[0]?.id,
-        logged_in_at: new Date().toISOString()
-      }));
+      if (sessionSetError) throw sessionSetError;
 
       await refreshPermissions();
       router.push("/admin/dashboard");
-    } catch (err) {
-      setError("Login failed.");
+    } catch (err: any) {
+      console.error("Login exception:", err);
+      setError("An unexpected error occurred.");
       setLoading(false);
     }
   };

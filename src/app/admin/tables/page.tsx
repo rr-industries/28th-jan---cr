@@ -71,7 +71,7 @@ type CartItem = MenuItem & { quantity: number };
 
 // --- SUB-COMPONENT: ADMIN TABLES MANAGEMENT ---
 function AdminTablesPage() {
-  const { selectedOutlet, hasPermission } = useAdmin();
+  const { selectedOutlet, user, hasPermission } = useAdmin();
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
   const [showTableSettings, setShowTableSettings] = useState(false);
@@ -101,10 +101,15 @@ function AdminTablesPage() {
 
   const fetchTables = async () => {
     if (!selectedOutlet) return;
-    const { data } = await supabase
+    let query = supabase
       .from("cafe_tables")
-      .select("*")
-      .eq("outlet_id", selectedOutlet.id);
+      .select("*");
+
+    if (!user?.is_super_admin) {
+      query = query.eq("outlet_id", selectedOutlet.id);
+    }
+
+    const { data } = await query;
 
     if (data) {
       const sorted = [...data].sort((a, b) => {
@@ -418,7 +423,7 @@ function SharedOrderingPage() {
   const fetchData = async () => {
     if (!selectedOutlet) return;
 
-    const { data: tablesData } = await supabase
+    let queryTables = supabase
       .from("cafe_tables")
       .select(`
           *,
@@ -428,9 +433,13 @@ function SharedOrderingPage() {
             status,
             created_at
           )
-        `)
-      .eq("outlet_id", selectedOutlet.id)
-      .order("id");
+        `);
+
+    if (!user?.is_super_admin) {
+      queryTables = queryTables.eq("outlet_id", selectedOutlet.id);
+    }
+
+    const { data: tablesData } = await queryTables.order("id");
 
     if (tablesData) {
       const processedTables = tablesData.map((t: any) => ({
@@ -440,11 +449,16 @@ function SharedOrderingPage() {
       setTables(processedTables);
     }
 
-    const { data: menuData } = await supabase
+    let queryMenu = supabase
       .from("menu_items")
       .select("*")
-      .eq("outlet_id", selectedOutlet.id)
       .eq("is_available", true);
+
+    if (!user?.is_super_admin) {
+      queryMenu = queryMenu.eq("outlet_id", selectedOutlet.id);
+    }
+
+    const { data: menuData } = await queryMenu;
 
     if (menuData) setMenuItems(menuData);
     setLoading(false);

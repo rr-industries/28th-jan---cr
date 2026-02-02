@@ -169,8 +169,8 @@ export default function AdminSettings() {
       </div>
 
       <Tabs defaultValue="basic" className="w-full">
-        <ScrollArea className="w-full whitespace-nowrap rounded-md border bg-card p-1">
-          <TabsList className="inline-flex w-full justify-start bg-transparent">
+        <ScrollArea className="w-full rounded-md border bg-card/50 backdrop-blur-sm p-1.5 shadow-sm">
+          <TabsList className="flex w-max justify-start bg-transparent gap-2 px-1">
             <TabsTrigger value="basic" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white">
               <Info className="h-4 w-4" /> 1. Basic Info
             </TabsTrigger>
