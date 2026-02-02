@@ -82,7 +82,10 @@ export default function LeaveManagement() {
         const { data, error } = await query;
 
         if (error) {
-            console.error("Error fetching employees:", error);
+            const err = error as { message?: string; code?: string };
+            if (process.env.NODE_ENV === "development") {
+                console.error("Error fetching employees:", err?.message ?? "Unknown", { code: err?.code });
+            }
         } else {
             setEmployeesList(data || []);
         }
@@ -124,11 +127,28 @@ export default function LeaveManagement() {
 
             const { data, error } = await query;
 
-            if (error) throw error;
+        if (error) {
+            const err = error as { message?: string; code?: string };
+            if (err?.code === '401' || err?.message?.includes?.('401')) {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) {
+                    toast.error("Your session has expired. Please log out and log in again.");
+                    return;
+                }
+            }
+            throw error;
+            }
             setLeaves(data || []);
-        } catch (error) {
-            console.error(error);
-            toast.error("Failed to fetch leave requests");
+        } catch (e: unknown) {
+            const err = e as { message?: string; code?: string };
+            const errMsg = err?.message ?? "Failed to fetch leave requests";
+            if (process.env.NODE_ENV === "development") {
+                console.error("Error fetching leaves:", errMsg, { code: err?.code });
+            }
+            const message = (err?.message ?? "").includes("401") || err?.code === "401"
+                ? "Authentication error. Please log out and log in again."
+                : "Failed to fetch leave requests";
+            toast.error(message);
         } finally {
             setLoading(false);
         }
@@ -197,13 +217,32 @@ export default function LeaveManagement() {
                 end_date: format(new Date(), "yyyy-MM-dd"),
                 reason: ""
             });
-        } catch (e: any) {
-            const isRLSError = Object.keys(e || {}).length === 0 || e.code === '42501';
-            const message = isRLSError
-                ? "Permission denied by system security rules. Please contact admin."
-                : e.message || "Failed to submit leave";
+        } catch (e: unknown) {
+            const err = e as { message?: string; code?: string; details?: string; hint?: string };
+            const errMessage = err?.message ?? (typeof e === "string" ? e : "Failed to submit leave");
+            const errCode = err?.code;
+            const msg = (err?.message ?? "").toLowerCase();
+            const isRLSError =
+                (!err?.message && !err?.code) ||
+                errCode === "42501" ||
+                errCode === "401" ||
+                msg.includes("permission") ||
+                msg.includes("row-level security");
 
-            console.error("Leave submission error:", { error: e?.toString?.() || e, isRLSError, message });
+            let message = errMessage;
+
+            if (isRLSError) {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) {
+                    message = "Your session has expired. Please log out and log in again to refresh your authentication.";
+                } else {
+                    message = "Permission denied by system security rules. Please contact admin.";
+                }
+            }
+
+            if (process.env.NODE_ENV === "development") {
+                console.error("Leave submission error:", errMessage || errCode || "Unknown", { code: errCode, details: err?.details });
+            }
             toast.error(message);
         }
     };

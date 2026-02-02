@@ -290,19 +290,27 @@ export default function PayrollPage() {
             });
 
             // ========================================
-            // CRITICAL: Check auth state before insert
+            // CRITICAL: Check user is authenticated via context
             // ========================================
+            if (!user || !user.id) {
+                throw new Error("You are not authenticated. Please log in again.");
+            }
+
+            // Check for Supabase Auth session (optional but recommended for RLS)
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
             console.log("Auth check before insert:", {
                 hasSession: !!session,
                 userId: session?.user?.id,
                 userEmail: session?.user?.email,
+                contextUserId: user.id,
                 sessionError: sessionError ? JSON.stringify(sessionError) : null
             });
 
+            // Note: If no Supabase Auth session but user is logged in via legacy method,
+            // database operations may fail due to RLS policies. User should re-login.
             if (!session) {
-                throw new Error("You are not authenticated. Please log in again.");
+                console.warn("No Supabase Auth session found. If database operations fail, please log out and log in again to refresh your session.");
             }
 
             // ========================================
@@ -390,20 +398,31 @@ export default function PayrollPage() {
             setSelectedEmployee(null);
             fetchPayrollRecords();
 
-        } catch (error: any) {
-            const isRLSError = Object.keys(error || {}).length === 0 || error.code === '42501';
-            const message = isRLSError
-                ? "Permission denied by system security rules. Please contact admin."
-                : error.message || "An unexpected error occurred while generating payroll";
+        } catch (e: unknown) {
+            const err = e as { message?: string; code?: string; details?: string };
+            const errMessage = err?.message ?? "An unexpected error occurred while generating payroll";
+            const errCode = err?.code;
+            const msg = (err?.message ?? "").toLowerCase();
+            const isRLSError =
+                errCode === "42501" ||
+                errCode === "401" ||
+                msg.includes("permission") ||
+                msg.includes("row-level security");
 
-            console.error("Error generating payroll:", {
-                error: error?.toString?.() || error,
-                isRLSError,
-                message,
-                employee: selectedEmployee?.name,
-                month: format(currentMonth, "MMMM yyyy")
-            });
+            let message = errMessage;
 
+            if (isRLSError || !err?.message) {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) {
+                    message = "Your session has expired. Please log out and log in again to refresh your authentication.";
+                } else {
+                    message = "Permission denied by system security rules. Please contact admin.";
+                }
+            }
+
+            if (process.env.NODE_ENV === "development") {
+                console.error("Error generating payroll:", errMessage, { code: errCode, employee: selectedEmployee?.name, month: format(currentMonth, "MMMM yyyy") });
+            }
             toast.error(message);
         }
         finally {
@@ -874,7 +893,7 @@ export default function PayrollPage() {
                     <div className="py-4">
                         <Label className="text-sm font-bold">Employee</Label>
                         <Select
-                            value={selectedEmployee?.id}
+                            value={selectedEmployee?.id || ""}
                             onValueChange={(id) => {
                                 const emp = employees.find(e => e.id === id);
                                 if (emp) setSelectedEmployee(emp);

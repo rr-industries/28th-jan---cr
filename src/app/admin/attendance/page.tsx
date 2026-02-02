@@ -392,14 +392,14 @@ export default function AttendancePage() {
                                     Select Employee
                                 </Label>
                                 <Select
-                                    value={selectedEmployee?.id}
+                                    value={selectedEmployee?.id || ""}
                                     onValueChange={(id) => {
                                         const emp = employees.find(e => e.id === id);
                                         if (emp) setSelectedEmployee(emp);
                                     }}
                                 >
                                     <SelectTrigger className="h-12 rounded-xl mt-2">
-                                        <SelectValue />
+                                        <SelectValue placeholder="Select employee" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {employees.map(emp => (

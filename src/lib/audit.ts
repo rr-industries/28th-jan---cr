@@ -158,15 +158,21 @@ async function logAudit(entry: AuditLogEntry) {
             });
 
         if (error) {
-            const isRLSError = Object.keys(error || {}).length === 0 || error.code === '42501';
+            const err = error as { message?: string; code?: string; details?: string };
+            const errMessage = err?.message ?? "Failed to log audit entry";
+            const errCode = err?.code;
+            const msg = (err?.message ?? "").toLowerCase();
+            const isRLSError =
+                errCode === "42501" ||
+                errCode === "401" ||
+                msg.includes("permission") ||
+                msg.includes("row-level security");
             const message = isRLSError
                 ? "Permission denied by system security rules. Please contact admin."
-                : error.message || "Failed to log audit entry";
+                : errMessage;
 
-            if (isRLSError) {
-                // Skip logging empty RLS errors to console
-            } else {
-                console.error('Audit Log Error:', { error: error?.toString?.() || error, isRLSError, message });
+            if (process.env.NODE_ENV === "development" && !isRLSError) {
+                console.error("Audit Log Error:", errMessage, { code: errCode, details: err?.details });
             }
             return { success: false, error: { ...error, message } };
         }

@@ -165,8 +165,11 @@ export default function SecurityCenter() {
             }));
 
             setLogs(enhancedLogs);
-        } catch (e) {
-            console.error(e);
+        } catch (e: unknown) {
+            const err = e as { message?: string; code?: string };
+            if (process.env.NODE_ENV === "development") {
+                console.error("Failed to load audit logs:", err?.message ?? "Unknown error", { code: err?.code });
+            }
             toast.error("Failed to load audit logs");
         } finally {
             setLoading(false);
@@ -186,8 +189,11 @@ export default function SecurityCenter() {
 
             if (error) throw error;
             setSessions(data || []);
-        } catch (e) {
-            console.error(e);
+        } catch (e: unknown) {
+            const err = e as { message?: string; code?: string };
+            if (process.env.NODE_ENV === "development") {
+                console.error("Failed to load live sessions:", err?.message ?? "Unknown error", { code: err?.code });
+            }
             toast.error("Failed to load live sessions");
         } finally {
             setLoading(false);
@@ -203,11 +209,24 @@ export default function SecurityCenter() {
                 .limit(50);
             if (error) throw error;
             setAlerts(data || []);
-        } catch (error: any) {
-            const isRLSError = Object.keys(error || {}).length === 0 || error.code === '42501';
-            console.error('Failed to fetch alerts:', { error: error?.toString?.() || error, isRLSError });
-            if (isRLSError) {
+        } catch (e: unknown) {
+            const err = e as { message?: string; code?: string; details?: string };
+            const errMessage = err?.message ?? "Failed to fetch alerts";
+            const errCode = err?.code;
+            const msg = (err?.message ?? "").toLowerCase();
+            const isRLSError =
+                errCode === "42501" ||
+                errCode === "401" ||
+                msg.includes("permission") ||
+                msg.includes("row-level security");
+
+            if (process.env.NODE_ENV === "development") {
+                console.error("Failed to fetch alerts:", errMessage, { code: errCode, details: err?.details });
+            }
+            if (isRLSError || !err?.message) {
                 toast.error("Permission denied by system security rules.");
+            } else {
+                toast.error(errMessage);
             }
         }
     };
